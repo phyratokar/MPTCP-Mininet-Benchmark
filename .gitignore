@@ -1,2 +1,6 @@
 *.txt
-*.ipynb_checkpoints
+*.pyc
+.ipynb_checkpoints/
+node_modules/
+.idea/
+venv/

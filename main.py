@@ -1,4 +1,4 @@
-
+from MPMininet import MPMininet
 from mininet.topo import Topo
 from mininet.net import Mininet
 from mininet.cli import CLI
@@ -6,14 +6,13 @@ from mininet.node import CPULimitedHost
 from mininet.link import TCLink
 from mininet.util import dumpNodeConnections
 from mininet.log import setLogLevel
-import monotonic
 import shlex
 
 from subprocess import Popen, PIPE
 import os
 from argparse import ArgumentParser
 
-from two_path_topology import SingleMPFlowTopo, SharedLinkTopo, MPagainstSPTopo
+from MPTopolies import SingleMPFlowTopo, SharedLinkTopo, MPagainstSPTopo, MPTopo, JsonTopo
 
 parser = ArgumentParser(description="MPTCP TP and Latency tests")
 
@@ -24,6 +23,7 @@ parser.add_argument('--cc',
 
 parser.add_argument('--topo',
                     help="Topology to use",
+                    choices=['shared_link', 'two_paths', '', ''],
                     default='MPflow')
 
 parser.add_argument('--asymmetry',
@@ -70,44 +70,18 @@ def twoSendersMptcp(net):
     print("Done with experiments.\n" + "-"*80 + "\n")
 
 
-def set_system_variables(mptcp=True):
-    if mptcp:
-        Popen('sysctl -w net.mptcp.mptcp_enabled=1', stdout=PIPE, stderr=PIPE, shell=True).communicate()
-
-    # Congestion control setting
-    avail_cc = Popen('sysctl -n net.ipv4.tcp_available_congestion_control',
-                     stdout=PIPE, stderr=PIPE, shell=True).communicate()
-    if args.cc not in avail_cc[0].split(' '):
-        raise ModuleNotFoundError('maybe needed modprode on mininet VM?')
-    Popen('sysctl -w net.ipv4.tcp_congestion_control={}'.format(args.cc),
-          stdout=PIPE, stderr=PIPE, shell=True).communicate()
-    out = Popen('sysctl -n net.ipv4.tcp_congestion_control',
-                stdout=PIPE, stderr=PIPE, shell=True).communicate()
-    if args.cc not in out[0]:
-        raise NameError('not correct CC is set in system kernel, is: ' + out[0] + ', should be: ' + args.cc)
-
-
 def main():
     """Create and run multiple link network"""
-    set_system_variables()
-
-    # topo = SingleMPFlowTopo()
-    # topo = SharedLinkTopo()
-    topo = MPagainstSPTopo()
-
-    # add host=CPULimitedHost if applicable
-    net = Mininet(topo=topo, link=TCLink)
-
-    topo.setup_routing(net)
-
-    net.start()
+    net = MPMininet()
+    net.start(topology_name=args.topo, congestion_control=args.cc)
 
     # Debug CLI
-    CLI(net)
+    CLI(net.get_net())
 
     # Now we run the client and server
     # simpleMptcp(net)
-    twoSendersMptcp(net)
+    # twoSendersMptcp(net.get_net())
+    net.run()
 
     # CLI(net)
 
@@ -123,5 +97,4 @@ if __name__ == '__main__':
         print("-"*80)
         import traceback
         traceback.print_exc()
-        # reset_sysctl_options()
         os.system("killall -9 top bwm-ng tcpdump cat mnexec iperf; mn -c")

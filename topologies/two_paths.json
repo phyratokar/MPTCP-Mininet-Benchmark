@@ -1,0 +1,119 @@
+{
+  "type": "NetworkGraph",
+  "protocol": "static",
+  "version": "1.0.0",
+  "revision": "5031a799fcbe17f61d57e387bc3806de",
+  "metric": null,
+  "router_id": "10.0.0.0",
+  "topology_id": "mptcp-host-pair",
+  "label": "Simple MPTCP capable host pair",
+  "nodes": [
+    {
+      "id": "h1",
+      "local_addresses": [
+        "10.0.0.1",
+        "10.0.1.1"
+      ],
+      "properties": {
+        "server": "h2"
+      }
+    },
+    {
+      "id": "h2",
+      "local_addresses": [
+        "10.0.0.2",
+        "10.0.1.2"
+      ],
+      "properties": {
+      }
+    },
+    {
+      "id": "s1"
+    },
+    {
+      "id": "s2"
+    },
+    {
+      "id": "s3"
+    },
+    {
+      "id": "s4"
+    }
+  ],
+  "links": [
+    {
+      "source": "h1",
+      "target": "s1",
+      "cost": 1.000,
+      "cost_text": "?",
+      "properties": {
+        "latency": 0.1,
+        "latency_text": "ms",
+        "throughput": 10,
+        "throughput_text": "Mbps"
+      }
+    },
+    {
+      "source": "h1",
+      "target": "s3",
+      "cost": 1.000,
+      "cost_text": "1020  bit/s",
+      "properties": {
+        "latency": 0.1,
+        "latency_text": "ms",
+        "throughput": 10,
+        "throughput_text": "Mbps"
+      }
+    },
+    {
+      "source": "s1",
+      "target": "s2",
+      "cost": 1.000,
+      "cost_text": "1020  bit/s",
+      "properties": {
+        "latency": 1.000,
+        "latency_tests": [1, 2, 3, 5, 10, 20, 30, 40, 60, 100],
+        "latency_text": "ms",
+        "throughput": 10,
+        "throughput_text": "Mbps"
+      }
+    },
+    {
+      "source": "s3",
+      "target": "s4",
+      "cost": 1.000,
+      "cost_text": "1020  bit/s",
+      "properties": {
+        "latency": 1.000,
+        "latency_tests": [1, 2, 3, 5, 10, 20, 30, 40, 60, 100],
+        "latency_text": "ms",
+        "throughput": 10,
+        "throughput_text": "Mbps"
+      }
+    },
+    {
+      "source": "s2",
+      "target": "h2",
+      "cost": 1.000,
+      "cost_text": "1020  bit/s",
+      "properties": {
+        "latency": 0.1,
+        "latency_text": "ms",
+        "throughput": 10,
+        "throughput_text": "Mbps"
+      }
+    },
+    {
+      "source": "s4",
+      "target": "h2",
+      "cost": 1.000,
+      "cost_text": "1020  bit/s",
+      "properties": {
+        "latency": 0.1,
+        "latency_text": "ms",
+        "throughput": 10,
+        "throughput_text": "Mbps"
+      }
+    }
+  ]
+}
