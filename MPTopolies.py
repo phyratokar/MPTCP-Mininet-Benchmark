@@ -60,10 +60,10 @@ class JsonTopo(MPTopo):
         for node in config['nodes']:
             if node['id'].startswith('h'):
                 info('Host {} added'.format(node['id']))
-                nodes[node['id']] = self.addHost(node['id'])
+                nodes[node['id']] = self.addHost(str(node['id']))
             elif node['id'].startswith('s'):
                 info('Switch {} added'.format(node['id']))
-                nodes[node['id']] = self.addSwitch(node['id'])
+                nodes[node['id']] = self.addSwitch(str(node['id']))
             else:
                 error('Unknown node type encountered!')
                 exit(1)
@@ -77,12 +77,13 @@ class JsonTopo(MPTopo):
                 exit(1)
 
             hs, hd = nodes.get(src), nodes.get(dst)
+            # TODO should be variable tp and latency
             linkopts = dict(bw=throughput, delay='{}ms'.format(latency))
             link = self.addLink(hs, hd, **linkopts)
             info('Link added {}'.format(link))
 
-        print('\n'.join(['{} <-> {}, \tlatency: {}, \tbandwidth: {}Mbps'
-                        .format(s, d, c['delay'], c['bw']) for s, d, c in self.links(sort=True, withInfo=True)]))
+        # print('\n'.join(['{} <-> {}, \tlatency: {}, \tbandwidth: {}Mbps'
+        #                 .format(s, d, c['delay'], c['bw']) for s, d, c in self.links(sort=True, withInfo=True)]))
 
 
 class SharedLinkTopo(MPTopo):

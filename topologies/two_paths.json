@@ -72,6 +72,7 @@
       "cost_text": "1020  bit/s",
       "properties": {
         "latency": 1.000,
+        "latency_group": "a",
         "latency_tests": [1, 2, 3, 5, 10, 20, 30, 40, 60, 100],
         "latency_text": "ms",
         "throughput": 10,
@@ -85,6 +86,7 @@
       "cost_text": "1020  bit/s",
       "properties": {
         "latency": 1.000,
+        "latency_group": "b",
         "latency_tests": [1, 2, 3, 5, 10, 20, 30, 40, 60, 100],
         "latency_text": "ms",
         "throughput": 10,

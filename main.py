@@ -1,3 +1,5 @@
+import json
+
 from MPMininet import MPMininet
 from mininet.topo import Topo
 from mininet.net import Mininet
@@ -14,27 +16,43 @@ from argparse import ArgumentParser
 
 from MPTopolies import SingleMPFlowTopo, SharedLinkTopo, MPagainstSPTopo, MPTopo, JsonTopo
 
+Congestion_control_algorithms = ['lia', 'olia', 'balia', 'wvegas']
+
 parser = ArgumentParser(description="MPTCP TP and Latency tests")
+
+parser.add_argument('--all', '-a',
+                    action='store_true',
+                    help="Run all available tests")
 
 parser.add_argument('--cc',
                     help="Congestion Control Algorithm used (lia, olia, balia, wVegas)",
-                    choices=['lia', 'olia', 'balia', 'wvegas'],
-                    default='balia')
+                    choices=Congestion_control_algorithms,
+                    default=Congestion_control_algorithms[1])
 
 parser.add_argument('--topo',
                     help="Topology to use",
                     choices=['shared_link', 'two_paths', '', ''],
-                    default='MPflow')
+                    default='two_paths')
 
 parser.add_argument('--asymmetry',
-                    '-a',
                     help="How big should the latency differ between paths [1.0-3.0]",
                     type=float,
                     default=1.0)
 args = parser.parse_args()
 
 
-def simpleMptcp(net):
+def read_json(file_name):
+    if not os.path.isfile(file_name):
+        print('JSON topology file not found! {}'.format(file_name))
+        exit(1)
+
+    with open(file_name, 'r') as f:
+        config = json.load(f)
+
+    return config
+
+
+def simple_mptcp(net):
     h1, h2 = net.get('h1', 'h2')
     print("Running client and server")
 
@@ -50,7 +68,7 @@ def simpleMptcp(net):
     print('Done with experiments.\n' + '-'*80 + '\n')
 
 
-def twoSendersMptcp(net):
+def two_senders_mptcp(net):
     h1, h2, h3, h4 = net.get('h1', 'h2', 'h3', 'h4')
     print("Running clients and servers")
 
@@ -70,22 +88,73 @@ def twoSendersMptcp(net):
     print("Done with experiments.\n" + "-"*80 + "\n")
 
 
+def run_config():
+    topo_name = args.topo
+    cc_name = args.cc
+    config = read_json('topologies/' + topo_name + '.json')
+    variable_links = [(position, link) for position, link in enumerate(config['links'])
+                      if 'latency_tests' in link['properties']]
+
+    for link_delay in variable_links[0][1]['properties']['latency_tests']:
+        config['links'][variable_links[0][0]]['properties']['latency'] = link_delay
+
+        # TODO add second changing delay if applicable
+        net = MPMininet(config, cc_name, link_delay, start_cli=True)
+        #
+        CLI(net.get_net())
+        #
+        net.run()
+
+        net.get_net().stop()
+
+
+def run_all():
+    topo_name = args.topo
+    config = read_json('topologies/{}.json'.format(topo_name))
+    variable_links = [(position, link) for position, link in enumerate(config['links'])
+                      if 'latency_tests' in link['properties']]
+
+    for cc_name in Congestion_control_algorithms:
+        for (delay_a, delay_b) in [(5, 5), (1, 1), (1, 2), (1, 3), (1, 5), (2, 2), (2, 3), (2, 5), (3, 3), (3, 5)]:
+
+            # Set link latency
+            for link in config['links']:
+                if 'latency_group' in link['properties']:
+                    if link['properties']['latency_group'] == 'a':
+                        link['properties']['latency'] = delay_a
+                    elif link['properties']['latency_group'] == 'b':
+                        link['properties']['latency'] = delay_b
+                    else:
+                        raise NotImplementedError('Not yet implemented more than two latency_groups for links. {}'.format(link))
+
+            delay_dir = '{}ms-{}ms'.format(delay_a, delay_b)
+
+            net = MPMininet(config, cc_name, delay_name=delay_dir)
+
+            net.run()
+            net.stop()
+
+
 def main():
     """Create and run multiple link network"""
-    net = MPMininet()
-    net.start(topology_name=args.topo, congestion_control=args.cc)
+    if args.all:
+        run_all()
+    else:
+        config = read_json('topologies/' + args.topo + '.json')
+        topo = JsonTopo(config)
+        # topo = SingleMPFlowTopo()
 
-    # Debug CLI
-    CLI(net.get_net())
+        # add host=CPULimitedHost if applicable
+        net = Mininet(topo=topo, link=TCLink)
+        topo.setup_routing(net)
+        net.start()
 
-    # Now we run the client and server
-    # simpleMptcp(net)
-    # twoSendersMptcp(net.get_net())
-    net.run()
+        CLI(net)
 
-    # CLI(net)
 
-    net.stop()
+
+        # CLI(net)
+        net.stop()
 
 
 if __name__ == '__main__':
