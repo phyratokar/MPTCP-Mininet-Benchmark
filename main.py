@@ -1,20 +1,16 @@
+import copy
 import json
-
-from MPMininet import MPMininet
-from mininet.topo import Topo
-from mininet.net import Mininet
-from mininet.cli import CLI
-from mininet.node import CPULimitedHost
-from mininet.link import TCLink
-from mininet.util import dumpNodeConnections
-from mininet.log import setLogLevel
-import shlex
-
-from subprocess import Popen, PIPE
 import os
+import shlex
 from argparse import ArgumentParser
 
-from MPTopolies import SingleMPFlowTopo, SharedLinkTopo, MPagainstSPTopo, MPTopo, JsonTopo
+import numpy as np
+
+from MPMininet import MPMininet
+from MPTopolies import JsonTopo
+from mininet.cli import CLI
+from mininet.link import TCLink
+from mininet.net import Mininet
 
 Congestion_control_algorithms = ['lia', 'olia', 'balia', 'wvegas']
 
@@ -31,7 +27,8 @@ parser.add_argument('--cc',
 
 parser.add_argument('--topo',
                     help="Topology to use",
-                    choices=['shared_link', 'two_paths', '', ''],
+                    required=True,
+                    choices=['shared_link', 'two_paths', 'mp-vs-sp', ''],
                     default='two_paths')
 
 parser.add_argument('--asymmetry',
@@ -88,51 +85,78 @@ def two_senders_mptcp(net):
     print("Done with experiments.\n" + "-"*80 + "\n")
 
 
-def run_config():
-    topo_name = args.topo
-    cc_name = args.cc
-    config = read_json('topologies/' + topo_name + '.json')
-    variable_links = [(position, link) for position, link in enumerate(config['links'])
-                      if 'latency_tests' in link['properties']]
-
-    for link_delay in variable_links[0][1]['properties']['latency_tests']:
-        config['links'][variable_links[0][0]]['properties']['latency'] = link_delay
-
-        # TODO add second changing delay if applicable
-        net = MPMininet(config, cc_name, link_delay, start_cli=True)
-        #
-        CLI(net.get_net())
-        #
-        net.run()
-
-        net.get_net().stop()
-
-
 def run_all():
     topo_name = args.topo
-    config = read_json('topologies/{}.json'.format(topo_name))
-    variable_links = [(position, link) for position, link in enumerate(config['links'])
-                      if 'latency_tests' in link['properties']]
+
+    delays = np.arange(1, 101, 10)
 
     for cc_name in Congestion_control_algorithms:
-        for (delay_a, delay_b) in [(5, 5), (1, 1), (1, 2), (1, 3), (1, 5), (2, 2), (2, 3), (2, 5), (3, 3), (3, 5)]:
+        for delay_a in delays[:3]:
+            for delay_b in [d for d in delays if d >= delay_a]:
 
-            # Set link latency
-            for link in config['links']:
-                if 'latency_group' in link['properties']:
-                    if link['properties']['latency_group'] == 'a':
-                        link['properties']['latency'] = delay_a
-                    elif link['properties']['latency_group'] == 'b':
-                        link['properties']['latency'] = delay_b
-                    else:
-                        raise NotImplementedError('Not yet implemented more than two latency_groups for links. {}'.format(link))
+                # Read in config file containing the topology
+                config = read_json('topologies/{}.json'.format(topo_name))
 
-            delay_dir = '{}ms-{}ms'.format(delay_a, delay_b)
+                # Set link latency
+                for link in config['links']:
+                    if 'latency_group' in link['properties']:
+                        if link['properties']['latency_group'] == 'a':
+                            link['properties']['latency'] = delay_a
+                        elif link['properties']['latency_group'] == 'b':
+                            link['properties']['latency'] = delay_b
+                        else:
+                            raise NotImplementedError('Not yet implemented more than two latency_groups for links. {}'.format(link))
 
-            net = MPMininet(config, cc_name, delay_name=delay_dir)
+                delay_dir = '{}ms-{}ms'.format(delay_a, delay_b)
 
-            net.run()
-            net.stop()
+                # Run experiments
+                for rep in range(3):
+                    net = MPMininet(config, cc_name, delay_name=delay_dir, repetition_number=rep)
+
+                    # net.run()
+                    # net.stop()
+
+
+def extract_delay_groups(config):
+    groups = set()
+    for link in config['links']:
+        if 'latency_group' in link['properties']:
+            groups.add(link['properties']['latency_group'])
+    return groups
+
+
+def run_all2():
+    topo_name = args.topo
+
+    # Read in config file containing the topology
+    orig_config = read_json('topologies/{}.json'.format(topo_name))
+    delay_groups = extract_delay_groups(orig_config)
+
+    delays = np.arange(1, 101, 50)
+
+    for cc_name in Congestion_control_algorithms:
+        for delay_a in delays[:3]:
+            for delay_b in [d for d in delays if d >= delay_a]:
+                config = copy.deepcopy(orig_config)
+
+                # Set link latency
+                for link in config['links']:
+                    if 'latency_group' in link['properties']:
+                        if link['properties']['latency_group'] == 'a':
+                            link['properties']['latency'] = delay_a
+                        elif link['properties']['latency_group'] == 'b':
+                            link['properties']['latency'] = delay_b
+                        else:
+                            raise NotImplementedError('Not yet implemented more than two latency_groups for links. {}'.format(link))
+
+                delay_dir = '{}ms-{}ms'.format(delay_a, delay_b)
+
+                # Run experiments
+                for rep in range(3):
+                    net = MPMininet(config, cc_name, delay_name=delay_dir, repetition_number=rep)
+
+                    # net.run()
+                    # net.stop()
 
 
 def main():

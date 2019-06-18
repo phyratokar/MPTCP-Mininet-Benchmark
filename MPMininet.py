@@ -1,28 +1,23 @@
-import json
+import itertools
+import os
+import shlex
 import time
 
-from mininet.topo import Topo
-from mininet.net import Mininet
+from MPTopolies import JsonTopo
 from mininet.cli import CLI
-from mininet.node import CPULimitedHost
 from mininet.link import TCLink
-from mininet.util import dumpNodeConnections, errRun, errFail
-from mininet.log import setLogLevel, error, info
-import shlex
-
-from subprocess import Popen, PIPE
-import os
-from argparse import ArgumentParser
-
-from MPTopolies import SingleMPFlowTopo, SharedLinkTopo, MPagainstSPTopo, MPTopo, JsonTopo
+from mininet.log import error, info
+from mininet.net import Mininet
+from mininet.util import errFail
 
 
 class MPMininet:
-    """Create and run multiple link network"""
-    def __init__(self, json_config, congestion_control, delay_name, start_cli=False):
+    """Create and run multiple paths network"""
+    def __init__(self, json_config, congestion_control, delay_name, repetition_number=0, start_cli=False):
         self.config = json_config
         self.congestion_control = congestion_control
         self.delay_name = delay_name
+        self.rep_num = repetition_number
         self.topology = json_config['topology_id']
         self.net = None
         self.out_folder = './logs'
@@ -71,18 +66,28 @@ class MPMininet:
         for node in [node for node in self.config['nodes'] if node['id'].startswith('h')]:
             if 'server' in node['properties']:
                 pairs.append((str(node['id']), str(node['properties']['server'])))
+
+        # make sure every host is included in some connection
+        hosts = itertools.chain.from_iterable(pairs)
+        for node in [node for node in self.config['nodes'] if node['id'].startswith('h')]:
+            if node['id'] not in hosts:
+                error('Host {} not contained in any host pairings!'.format(node))
+
         mininet_host_pairs = map(lambda x: (self.net.get(x[0]), self.net.get(x[1])), pairs)
         return mininet_host_pairs
 
-    def start_custom_code(self, host_pairs, ):
-        folder = self.out_folder + '{}/{}/{}ms-{}ms/'.format(self.topology, self.congestion_control, )
-        os.makedirs(folder, exist_ok=True)
-
-        server_command = 'python receiver.py -p 5001 -o '
-
-    def run(self):
+    def run_iperf(self):
         iperf_pairs = self.get_iperf_pairings()
-        print("Running client and server")
+
+        folder = '{}/{}/{}/{}'.format(self.out_folder, self.topology, self.congestion_control, self.delay_name)
+        if not os.path.exists(folder):
+            os.makedirs(folder)
+
+        processes = []
+
+    def run(self, runtime=30):
+        iperf_pairs = self.get_iperf_pairings()
+        print("Running client and server, repetition: {}".format(self.rep_num))
 
         folder = '{}/{}/{}/{}'.format(self.out_folder, self.topology, self.congestion_control, self.delay_name)
 
@@ -94,7 +99,7 @@ class MPMininet:
         for _, server in iperf_pairs:
             print('server name is {}'.format(server))
             server_cmd = 'python receiver.py -p 5001 '
-            server_cmd += '-o {}/{}-{}.txt'.format(folder, 1, server)
+            server_cmd += '-o {}/{}-{}.txt'.format(folder, self.rep_num, server)
             print(server_cmd)
 
             processes.append(server.popen(shlex.split(server_cmd)))
@@ -103,8 +108,8 @@ class MPMininet:
         for client, server in iperf_pairs:
             client_cmd = 'python sender.py -p 5001'
             client_cmd += ' -s {}'.format(server.IP())
-            client_cmd += ' -o {}/{}-{}.txt'.format(folder, 1, client)
-            client_cmd += ' -t {}'.format(20)
+            client_cmd += ' -o {}/{}-{}.txt'.format(folder, self.rep_num, client)
+            client_cmd += ' -t {}'.format(runtime)
             print(client_cmd)
             processes.append(client.popen(shlex.split(client_cmd)))
 
