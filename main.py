@@ -12,7 +12,7 @@ from mininet.cli import CLI
 from mininet.link import TCLink
 from mininet.net import Mininet
 
-Congestion_control_algorithms = ['lia', 'olia', 'balia', 'wvegas']
+Congestion_control_algorithms = ['lia', 'olia', 'balia', 'wvegas', 'cubic']
 
 parser = ArgumentParser(description="MPTCP TP and Latency tests")
 
@@ -27,8 +27,7 @@ parser.add_argument('--cc',
 
 parser.add_argument('--topo',
                     help="Topology to use",
-                    required=True,
-                    choices=['shared_link', 'two_paths', 'mp-vs-sp', ''],
+                    choices=['shared_link', 'two_paths', 'mp-vs-sp', 'single_path'],
                     default='two_paths')
 
 parser.add_argument('--asymmetry',
@@ -85,84 +84,120 @@ def two_senders_mptcp(net):
     print("Done with experiments.\n" + "-"*80 + "\n")
 
 
-def run_all():
-    topo_name = args.topo
+def run_all(topo_name):
+    delays = np.arange(1, 102, 20)
 
-    delays = np.arange(1, 101, 10)
+    for rep in [8]: # range(3):# [2:]: # fixme: remove less runs and less cc
+        for cc_name in Congestion_control_algorithms:# [1:]:
+            for delay_a in [41]: #delays:
+                for delay_b in delays:  # [d for d in delays if d >= delay_a]:
 
-    for cc_name in Congestion_control_algorithms:
-        for delay_a in delays[:3]:
-            for delay_b in [d for d in delays if d >= delay_a]:
+                    # Read in config file containing the topology
+                    config = read_json('topologies/{}.json'.format(topo_name))
 
-                # Read in config file containing the topology
-                config = read_json('topologies/{}.json'.format(topo_name))
+                    # Set link latency
+                    for link in config['links']:
+                        if 'latency_group' in link['properties']:
+                            if link['properties']['latency_group'] == 'a':
+                                link['properties']['latency'] = delay_a
+                            elif link['properties']['latency_group'] == 'b':
+                                link['properties']['latency'] = delay_b
+                            else:
+                                raise NotImplementedError('Not yet implemented more than two latency_groups for links. {}'.format(link))
 
-                # Set link latency
-                for link in config['links']:
-                    if 'latency_group' in link['properties']:
-                        if link['properties']['latency_group'] == 'a':
-                            link['properties']['latency'] = delay_a
-                        elif link['properties']['latency_group'] == 'b':
-                            link['properties']['latency'] = delay_b
-                        else:
-                            raise NotImplementedError('Not yet implemented more than two latency_groups for links. {}'.format(link))
+                    delay_dir = '{}ms-{}ms'.format(delay_a, delay_b)
+                    tp_dir = '{}Mbps-{}Mbps'.format(10, 10)
 
-                delay_dir = '{}ms-{}ms'.format(delay_a, delay_b)
-
-                # Run experiments
-                for rep in range(3):
-                    net = MPMininet(config, cc_name, delay_name=delay_dir, repetition_number=rep)
-
-                    # net.run()
-                    # net.stop()
+                    # Run experiments
+                    MPMininet(config, cc_name, delay_name=delay_dir, throughput_name=tp_dir, repetition_number=rep)
+                    return
 
 
-def extract_delay_groups(config):
+def extract_groups(config, kind='lt'):
+    if kind is 'lt':
+        group_field = 'latency_group'
+    elif kind is 'tp':
+        group_field = 'throughput_group'
+    else:
+        raise NotImplementedError('Only latency and throughput groups currently supported, {} not recognized.'.format(kind))
     groups = set()
     for link in config['links']:
         if 'latency_group' in link['properties']:
-            groups.add(link['properties']['latency_group'])
+            groups.add(link['properties'][group_field])
     return groups
 
 
-def run_all2():
-    topo_name = args.topo
-
+def run_tp_fairness(topo_name):
     # Read in config file containing the topology
     orig_config = read_json('topologies/{}.json'.format(topo_name))
-    delay_groups = extract_delay_groups(orig_config)
+    tp_groups = extract_groups(orig_config, kind='tp')
 
-    delays = np.arange(1, 101, 50)
+    # tps_a = [5, 7, 9, 11, 12, 13, 14, 15, 16, 17, 18, 19, 21, 23, 25]
+    # tps_b = [5, 7, 9, 11, 12, 13, 14, 15, 16, 17, 18, 19, 21, 23, 25]
 
-    for cc_name in Congestion_control_algorithms:
-        for delay_a in delays[:3]:
-            for delay_b in [d for d in delays if d >= delay_a]:
+    tps_a = [5, 9, 13, 15, 17, 21, 25]
+    tps_b = [5, 9, 13, 15, 17, 21, 25]
+
+    for rep in range(3):
+        for cc_name in Congestion_control_algorithms:
+            for tp_a in tps_a:
+                for tp_b in tps_b:
+                    config = copy.deepcopy(orig_config)
+
+                    # Set link throughputs
+                    for link in config['links']:
+                        if 'throughput_group' in link['properties']:
+                            if link['properties']['throughput_group'] == 'a':
+                                link['properties']['throughput'] = tp_a
+                            elif link['properties']['throughput_group'] == 'b':
+                                link['properties']['throughput'] = tp_b
+                            else:
+                                raise NotImplementedError('Not yet implemented more than two throughput_groups for links. {}'.format(link))
+
+                    delay_dir = '{}ms-{}ms'.format(10, 10)
+                    tp_dir = '{}Mbps-{}Mbps'.format(tp_a, tp_b)
+
+                    # Run experiments
+                    MPMininet(config, cc_name, delay_name=delay_dir, throughput_name=tp_dir, repetition_number=rep)
+                    return
+
+
+def run_tp_fairness_single(topo_name):
+    # Read in config file containing the topology
+    orig_config = read_json('topologies/{}.json'.format(topo_name))
+    tp_groups = extract_groups(orig_config, kind='tp')
+
+    # tps_a = [5, 7, 9, 11, 12, 13, 14, 15, 16, 17, 18, 19, 21, 23, 25]
+    tps_a = [5, 9, 13, 15, 17, 21, 25]
+
+    for rep in range(3):
+        for cc_name in Congestion_control_algorithms:
+            for tp_a in tps_a:
                 config = copy.deepcopy(orig_config)
 
-                # Set link latency
+                # Set link throughputs
                 for link in config['links']:
-                    if 'latency_group' in link['properties']:
-                        if link['properties']['latency_group'] == 'a':
-                            link['properties']['latency'] = delay_a
-                        elif link['properties']['latency_group'] == 'b':
-                            link['properties']['latency'] = delay_b
+                    if 'throughput_group' in link['properties']:
+                        if link['properties']['throughput_group'] == 'a':
+                            link['properties']['throughput'] = tp_a
                         else:
-                            raise NotImplementedError('Not yet implemented more than two latency_groups for links. {}'.format(link))
+                            raise NotImplementedError('Not yet implemented more than two throughput_groups for links. {}'.format(link))
 
-                delay_dir = '{}ms-{}ms'.format(delay_a, delay_b)
+                delay_dir = '{}ms-{}ms'.format(10, 10)
+                tp_dir = '{}Mbps-{}Mbps'.format(tp_a, 0)
 
                 # Run experiments
-                for rep in range(3):
-                    net = MPMininet(config, cc_name, delay_name=delay_dir, repetition_number=rep)
 
-                    # net.run()
-                    # net.stop()
+                MPMininet(config, cc_name, delay_name=delay_dir, throughput_name=tp_dir, repetition_number=rep)
 
 
 def main():
     """Create and run multiple link network"""
     if args.all:
-        run_all()
+        run_all('two_paths')
+        # run_tp_fairness('mp-vs-sp')
+        # run_tp_fairness_single('single_path')
+        pass
     else:
         config = read_json('topologies/' + args.topo + '.json')
         topo = JsonTopo(config)

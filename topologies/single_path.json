@@ -5,8 +5,8 @@
   "revision": "",
   "metric": null,
   "router_id": "10.0.0.0",
-  "topology_id": "mptcp-host-pair",
-  "label": "Simple MPTCP capable host pair",
+  "topology_id": "single_path",
+  "label": "Hosts connected through single path",
   "nodes": [
     {
       "id": "h1",
@@ -32,12 +32,6 @@
     },
     {
       "id": "s2"
-    },
-    {
-      "id": "s3"
-    },
-    {
-      "id": "s4"
     }
   ],
   "links": [
@@ -53,53 +47,20 @@
       }
     },
     {
-      "source": "h1",
-      "target": "s3",
-      "cost": 1.000,
-      "properties": {
-        "latency": 0.1,
-        "latency_text": "ms",
-        "throughput": 10,
-        "throughput_text": "Mbps"
-      }
-    },
-    {
       "source": "s1",
       "target": "s2",
       "cost": 1.000,
       "properties": {
-        "latency": 10.000,
+        "latency": 10.0,
         "latency_group": "a",
         "latency_text": "ms",
         "throughput": 10,
-        "throughput_text": "Mbps"
-      }
-    },
-    {
-      "source": "s3",
-      "target": "s4",
-      "cost": 1.000,
-      "properties": {
-        "latency": 10.000,
-        "latency_group": "b",
-        "latency_text": "ms",
-        "throughput": 10,
+        "throughput_group": "a",
         "throughput_text": "Mbps"
       }
     },
     {
       "source": "s2",
-      "target": "h2",
-      "cost": 1.000,
-      "properties": {
-        "latency": 0.1,
-        "latency_text": "ms",
-        "throughput": 10,
-        "throughput_text": "Mbps"
-      }
-    },
-    {
-      "source": "s4",
       "target": "h2",
       "cost": 1.000,
       "properties": {

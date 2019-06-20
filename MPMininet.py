@@ -1,22 +1,23 @@
 import itertools
 import os
 import shlex
+import signal
 import time
 
 from MPTopolies import JsonTopo
 from mininet.cli import CLI
-from mininet.link import TCLink
 from mininet.log import error, info
 from mininet.net import Mininet
-from mininet.util import errFail
+from mininet.util import errFail, pmonitor
+from mininet.link import TCLink
 
 
 class MPMininet:
     """Create and run multiple paths network"""
-    def __init__(self, json_config, congestion_control, delay_name, repetition_number=0, start_cli=False):
+    def __init__(self, json_config, congestion_control, delay_name, throughput_name, repetition_number=0, start_cli=False):
         self.config = json_config
         self.congestion_control = congestion_control
-        self.delay_name = delay_name
+        self.delay_name, self.tp_name = delay_name, throughput_name
         self.rep_num = repetition_number
         self.topology = json_config['topology_id']
         self.net = None
@@ -24,7 +25,7 @@ class MPMininet:
         self.start(start_cli)
 
     def start(self, cli):
-        self.set_system_variables(mptcp=True, cc=self.congestion_control)
+        self.set_system_variables(mptcp=(self.congestion_control not in ['cubic']), cc=self.congestion_control)
 
         topo = JsonTopo(self.config)
 
@@ -36,7 +37,8 @@ class MPMininet:
         if cli:
             CLI(self.net)
 
-        self.run()
+        # self.run()
+        self.run_iperf()
 
         # CLI(self.net)
         self.net.stop()
@@ -50,13 +52,13 @@ class MPMininet:
         out, err, ret = errFail(['sysctl', '-n', var])
         info('type {} and value "{}"'.format(type(out), out))
         out = out.replace('\n', '')
-        if type(value) is bool and bool(out) != value or type(value) is not bool and out != value:
+        if type(value) is bool and bool(out) != value or type(value) is not bool and out != str(value):
             raise Exception("sysctl Fail: setting {} failed, should be {} is {}".format(var, value, out))
 
     @staticmethod
     def set_system_variables(mptcp, cc):
         # Setting up MPTCP
-        MPMininet._set_system_variable('net.mptcp.mptcp_enabled', mptcp)
+        MPMininet._set_system_variable('net.mptcp.mptcp_enabled', int(mptcp))
 
         # Congestion control
         MPMininet._set_system_variable('net.ipv4.tcp_congestion_control', cc)
@@ -76,20 +78,63 @@ class MPMininet:
         mininet_host_pairs = map(lambda x: (self.net.get(x[0]), self.net.get(x[1])), pairs)
         return mininet_host_pairs
 
-    def run_iperf(self):
+    def run_iperf(self, runtime=30, skipping=False):
         iperf_pairs = self.get_iperf_pairings()
+        info("Running iperf, repetition: {}".format(self.rep_num))
 
-        folder = '{}/{}/{}/{}'.format(self.out_folder, self.topology, self.congestion_control, self.delay_name)
+        folder = '{}/{}/{}/{}/{}'.format(self.out_folder, self.topology, self.congestion_control, self.tp_name, self.delay_name)
         if not os.path.exists(folder):
             os.makedirs(folder)
 
-        processes = []
+        # TODO: start tcpdump per sending client
+        # TODO: start iperf client per client and wait for completion of them all, throw error if any of them is not
+        # connected or encounters issue
+
+        servers = []
+        clients = []
+        client_tcpdumps = []
+
+        if os.path.isfile('{}/{}-{}_iperf.txt'.format(folder, self.rep_num, 'h2')) and skipping:
+            print('already done.')
+            return
+
+        for _, server in iperf_pairs:
+            server_cmd = 'iperf -s -y C'
+            # server_cmd += ' --size {}'.format(8000)
+            server_cmd += ' | tee {}/{}-{}_iperf.txt'.format(folder, self.rep_num, server)
+            print('Running \'{}\' on {}'.format(server_cmd, server))
+
+            servers.append(server.popen(server_cmd, shell=True))
+        time.sleep(1)
+
+        for client, server in iperf_pairs:
+            hosts = ' and '.join(['host {}'.format(intf.IP()) for intf in server.intfList()])
+            print(hosts)
+            # client_tcpdumps.append(client.popen('tcpdump -i any -w {}/{}-{}_iperf_dump.txt {}'.format(folder, self.rep_num, client, hosts)))
+            client_cmd = 'iperf -y C'
+            client_cmd += ' -c {}'.format(server.IP())
+            client_cmd += ' -t {}'.format(runtime)
+            # client_cmd += ' --size {}'.format(8000)
+            client_cmd += ' | tee {}/{}-{}_iperf.txt'.format(folder, self.rep_num, client)
+            print('Running \'{}\' on {}'.format(client_cmd, client))
+            clients.append(client.popen(client_cmd, shell=True))
+
+        for process in clients:
+            process.wait()
+        for process in servers:
+            os.system('killall -SIGINT iperf')
+            process.send_signal(signal.SIGINT)
+            # print(process.communicate()[0])
+        time.sleep(1)
+        os.system('killall -9 iperf')
+
+        print('Done with experiment\n' + '.'*80 + '\n')
 
     def run(self, runtime=30):
         iperf_pairs = self.get_iperf_pairings()
-        print("Running client and server, repetition: {}".format(self.rep_num))
+        info("Running clients and servers, repetition: {}".format(self.rep_num))
 
-        folder = '{}/{}/{}/{}'.format(self.out_folder, self.topology, self.congestion_control, self.delay_name)
+        folder = '{}/{}/{}/{}/{}'.format(self.out_folder, self.topology, self.congestion_control, self.tp_name, self.delay_name)
 
         if not os.path.exists(folder):
             os.makedirs(folder)
@@ -97,10 +142,10 @@ class MPMininet:
         processes = []
 
         for _, server in iperf_pairs:
-            print('server name is {}'.format(server))
             server_cmd = 'python receiver.py -p 5001 '
             server_cmd += '-o {}/{}-{}.txt'.format(folder, self.rep_num, server)
-            print(server_cmd)
+            # server_cmd += ' --size {}'.format(8000)
+            print('Running \'{}\' on {}'.format(server_cmd, server))
 
             processes.append(server.popen(shlex.split(server_cmd)))
         time.sleep(1)
@@ -110,13 +155,14 @@ class MPMininet:
             client_cmd += ' -s {}'.format(server.IP())
             client_cmd += ' -o {}/{}-{}.txt'.format(folder, self.rep_num, client)
             client_cmd += ' -t {}'.format(runtime)
-            print(client_cmd)
+            # client_cmd += ' --size {}'.format(8000)
+            print('Running \'{}\' on {}'.format(client_cmd, client))
             processes.append(client.popen(shlex.split(client_cmd)))
 
         for process in processes:
             process.wait()
 
-        print('Done with experiments\n' + '.'*80 + '\n')
+        print('Done with experiment\n' + '.'*80 + '\n')
 
     def stop(self):
         self.net.stop()

@@ -5,12 +5,11 @@
   "revision": "",
   "metric": null,
   "router_id": "10.0.0.0",
-  "topology_id": "mptcp-vs-sptcp",
+  "topology_id": "mp-vs-sp",
   "label": "Compare MPTCP against SPTCP",
   "nodes": [
     {
       "id": "h1",
-      "label": "h1",
       "local_addresses": [
         "10.0.0.1",
         "10.0.1.1"
@@ -21,7 +20,6 @@
     },
     {
       "id": "h2",
-      "label": "h2",
       "local_addresses": [
         "10.0.0.2",
         "10.0.1.2"
@@ -31,7 +29,6 @@
     },
     {
       "id": "h3",
-      "label": "h3",
       "local_addresses": [
         "10.0.0.3",
         "10.0.1.3"
@@ -42,7 +39,6 @@
     },
     {
       "id": "h4",
-      "label": "h4",
       "local_addresses": [
         "10.0.0.4",
         "10.0.1.4"
@@ -102,10 +98,11 @@
       "target": "s2",
       "cost": 1.000,
       "properties": {
-        "latency": 1.0,
+        "latency": 10.0,
         "latency_group": "a",
         "latency_text": "ms",
         "throughput": 10,
+        "throughput_group": "a",
         "throughput_text": "Mbps"
       }
     },
@@ -114,10 +111,11 @@
       "target": "s4",
       "cost": 1.000,
       "properties": {
-        "latency": 1.0,
+        "latency": 10.0,
         "latency_group": "b",
         "latency_text": "ms",
         "throughput": 10,
+        "throughput_group": "b",
         "throughput_text": "Mbps"
       }
     },

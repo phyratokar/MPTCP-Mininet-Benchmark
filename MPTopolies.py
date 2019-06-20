@@ -45,9 +45,7 @@ class MPTopo(Topo):
 
     def setup_routing(self, net):
         for host in self.hosts():
-            # TODO shouldn't hosts contain the actual hosts?
             self._setup_routing_per_host(net.get(host))
-            print(host)
 
 
 class JsonTopo(MPTopo):
@@ -77,7 +75,6 @@ class JsonTopo(MPTopo):
                 exit(1)
 
             hs, hd = nodes.get(src), nodes.get(dst)
-            # TODO should be variable tp and latency
             linkopts = dict(bw=throughput, delay='{}ms'.format(latency))
             link = self.addLink(hs, hd, **linkopts)
             info('Link added {}'.format(link))
