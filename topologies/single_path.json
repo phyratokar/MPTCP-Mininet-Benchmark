@@ -40,9 +40,10 @@
       "target": "s1",
       "cost": 1.000,
       "properties": {
-        "latency": 0.1,
+        "latency": 0,
         "latency_text": "ms",
         "throughput": 10,
+        "throughput_group": "a",
         "throughput_text": "Mbps"
       }
     },
@@ -64,9 +65,10 @@
       "target": "h2",
       "cost": 1.000,
       "properties": {
-        "latency": 0.1,
+        "latency": 0,
         "latency_text": "ms",
         "throughput": 10,
+        "throughput_group": "a",
         "throughput_text": "Mbps"
       }
     }
