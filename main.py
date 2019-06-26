@@ -11,30 +11,9 @@ from MPTopolies import JsonTopo
 from mininet.cli import CLI
 from mininet.link import TCLink
 from mininet.net import Mininet
+from mininet.log import setLogLevel
 
 Congestion_control_algorithms = ['lia', 'olia', 'balia', 'wvegas', 'cubic']
-
-parser = ArgumentParser(description="MPTCP TP and Latency tests")
-
-parser.add_argument('--all', '-a',
-                    action='store_true',
-                    help="Run all available tests")
-
-parser.add_argument('--cc',
-                    help="Congestion Control Algorithm used (lia, olia, balia, wVegas)",
-                    choices=Congestion_control_algorithms,
-                    default=Congestion_control_algorithms[1])
-
-parser.add_argument('--topo',
-                    help="Topology to use",
-                    choices=['shared_link', 'two_paths', 'mp-vs-sp', 'single_path'],
-                    default='two_paths')
-
-parser.add_argument('--asymmetry',
-                    help="How big should the latency differ between paths [1.0-3.0]",
-                    type=float,
-                    default=1.0)
-args = parser.parse_args()
 
 
 def read_json(file_name):
@@ -48,48 +27,12 @@ def read_json(file_name):
     return config
 
 
-def simple_mptcp(net):
-    h1, h2 = net.get('h1', 'h2')
-    print("Running client and server")
+def run_latency(topo_name):
+    delays = np.arange(0, 102, 20)
 
-    server_command = 'python receiver.py -p 5001 -o {}-{}-rcv{}.txt'.format(args.cc, args.topo, 2)
-    server_args = shlex.split(server_command)
-    server = h2.popen(server_args)
-    client_command = 'python sender.py -s 10.0.0.2 -p 5001 -o {}-{}-snd{}.txt -t {}'.format(args.cc, args.topo, 1, 30)
-    client_args = shlex.split(client_command)
-    client = h1.popen(client_args)
-    client.wait()
-    server.wait()
-
-    print('Done with experiments.\n' + '-'*80 + '\n')
-
-
-def two_senders_mptcp(net):
-    h1, h2, h3, h4 = net.get('h1', 'h2', 'h3', 'h4')
-    print("Running clients and servers")
-
-    server_command = "python receiver.py -p 5001 -o {}-{}".format(args.cc, args.topo) + '-rcv{}.txt'
-    server2 = h2.popen(shlex.split(server_command.format(2)))
-    server4 = h4.popen(shlex.split(server_command.format(4)))
-
-    client_command = 'python sender.py -s 10.0.0.2 -p 5001 -o {}-{}'.format(args.cc, args.topo) + '-snd{}.txt -t {}'
-    client1 = h1.popen(shlex.split(client_command.format(1, 30)))
-    client_command = 'python sender.py -s 10.0.0.4 -p 5001 -o {}-{}'.format(args.cc, args.topo) + '-snd{}.txt -t {}'
-    client3 = h3.popen(shlex.split(client_command.format(3, 30)))
-    client1.wait()
-    client3.wait()
-    server2.wait()
-    server4.wait()
-
-    print("Done with experiments.\n" + "-"*80 + "\n")
-
-
-def run_all(topo_name):
-    delays = np.arange(1, 102, 20)
-
-    for rep in [8]: # range(3):# [2:]: # fixme: remove less runs and less cc
-        for cc_name in Congestion_control_algorithms:# [1:]:
-            for delay_a in [41]: #delays:
+    for rep in range(3):  # [2:]: # fixme: remove less runs and less cc
+        for cc_name in Congestion_control_algorithms:  # [1:]:
+            for delay_a in delays:
                 for delay_b in delays:  # [d for d in delays if d >= delay_a]:
 
                     # Read in config file containing the topology
@@ -110,7 +53,7 @@ def run_all(topo_name):
 
                     # Run experiments
                     MPMininet(config, cc_name, delay_name=delay_dir, throughput_name=tp_dir, repetition_number=rep)
-                    return
+                    # return
 
 
 def extract_groups(config, kind='lt'):
@@ -153,6 +96,8 @@ def run_tp_fairness(topo_name):
                                 link['properties']['throughput'] = tp_b
                             else:
                                 raise NotImplementedError('Not yet implemented more than two throughput_groups for links. {}'.format(link))
+                        else:
+                            raise
 
                     delay_dir = '{}ms-{}ms'.format(10, 10)
                     tp_dir = '{}Mbps-{}Mbps'.format(tp_a, tp_b)
@@ -194,7 +139,7 @@ def run_tp_fairness_single(topo_name):
 def main():
     """Create and run multiple link network"""
     if args.all:
-        run_all('two_paths')
+        run_latency('two_paths')
         # run_tp_fairness('mp-vs-sp')
         # run_tp_fairness_single('single_path')
         pass
@@ -210,14 +155,39 @@ def main():
 
         CLI(net)
 
-
-
-        # CLI(net)
         net.stop()
 
 
 if __name__ == '__main__':
+    parser = ArgumentParser(description="MPTCP TP and Latency tests")
+
+    parser.add_argument('--all', '-a',
+                        action='store_true',
+                        help="Run all available tests")
+
+    parser.add_argument('--log',
+                        choices=['info', 'debug', 'output', 'warning', 'error', 'critical'],
+                        help="Mininet logging level")
+
+    parser.add_argument('--cc',
+                        help="Congestion Control Algorithm used (lia, olia, balia, wVegas)",
+                        choices=Congestion_control_algorithms,
+                        default=Congestion_control_algorithms[1])
+
+    parser.add_argument('--topo',
+                        help="Topology to use",
+                        choices=['shared_link', 'two_paths', 'mp-vs-sp', 'single_path'],
+                        default='two_paths')
+
+    parser.add_argument('--asymmetry',
+                        help="How big should the latency differ between paths [1.0-3.0]",
+                        type=float,
+                        default=1.0)
+    args = parser.parse_args()
+
     try:
+        if args.log:
+            setLogLevel(args.log)
         main()
     except:
         print("-" * 80)

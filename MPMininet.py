@@ -6,10 +6,18 @@ import time
 
 from MPTopolies import JsonTopo
 from mininet.cli import CLI
-from mininet.log import error, info
+from mininet.log import error, info, output
 from mininet.net import Mininet
-from mininet.util import errFail, pmonitor
+from mininet.util import errFail
 from mininet.link import TCLink
+
+
+def popen_wait(popen_task, timeout=-1):
+    delay = 1.0
+    while popen_task.poll() is None and timeout > 0:
+        time.sleep(delay)
+        timeout += delay
+    return popen_task.poll() is not None
 
 
 class MPMininet:
@@ -43,9 +51,6 @@ class MPMininet:
         # CLI(self.net)
         self.net.stop()
 
-    def get_net(self):
-        return self.net
-
     @staticmethod
     def _set_system_variable(var, value):
         errFail(['sysctl', '-w', '{0}={1}'.format(var, value)])
@@ -73,16 +78,20 @@ class MPMininet:
         hosts = itertools.chain.from_iterable(pairs)
         for node in [node for node in self.config['nodes'] if node['id'].startswith('h')]:
             if node['id'] not in hosts:
-                error('Host {} not contained in any host pairings!'.format(node))
+                error('Host {} not contained in any host pairings!\n'.format(node))
 
         mininet_host_pairs = map(lambda x: (self.net.get(x[0]), self.net.get(x[1])), pairs)
         return mininet_host_pairs
 
-    def run_iperf(self, runtime=30, skipping=False):
+    def run_iperf(self, runtime=10, skipping=False, capture_tcp=True):
         iperf_pairs = self.get_iperf_pairings()
-        info("Running iperf, repetition: {}".format(self.rep_num))
-
         folder = '{}/{}/{}/{}/{}'.format(self.out_folder, self.topology, self.congestion_control, self.tp_name, self.delay_name)
+
+        output('Running iperf3, repetition: {}\n'.format(self.rep_num))
+        if skipping and os.path.isfile('{}/{}-{}_iperf.txt'.format(folder, self.rep_num, 'h2')):
+            print('already done.')
+            return
+
         if not os.path.exists(folder):
             os.makedirs(folder)
 
@@ -94,45 +103,67 @@ class MPMininet:
         clients = []
         client_tcpdumps = []
 
-        if os.path.isfile('{}/{}-{}_iperf.txt'.format(folder, self.rep_num, 'h2')) and skipping:
-            print('already done.')
-            return
-
+        # Start processes on client and server
         for _, server in iperf_pairs:
-            server_cmd = 'iperf -s -y C'
-            # server_cmd += ' --size {}'.format(8000)
-            server_cmd += ' | tee {}/{}-{}_iperf.txt'.format(folder, self.rep_num, server)
-            print('Running \'{}\' on {}'.format(server_cmd, server))
+            server_cmd = ['iperf3', '-s', '-J', '-i', 0.1]
+            file_name = '{}/{}-{}_iperf.txt'.format(folder, self.rep_num, server)
 
-            servers.append(server.popen(server_cmd, shell=True))
+            server_cmd = map(str, server_cmd)
+            info('Running on {}: \'{}\'\n'.format(server, ' '.join(server_cmd)))
+            with open(file_name, 'w') as f:
+                servers.append(server.popen(server_cmd, stdout=f, stderr=f))
         time.sleep(1)
 
         for client, server in iperf_pairs:
-            hosts = ' and '.join(['host {}'.format(intf.IP()) for intf in server.intfList()])
-            print(hosts)
-            # client_tcpdumps.append(client.popen('tcpdump -i any -w {}/{}-{}_iperf_dump.txt {}'.format(folder, self.rep_num, client, hosts)))
-            client_cmd = 'iperf -y C'
-            client_cmd += ' -c {}'.format(server.IP())
-            client_cmd += ' -t {}'.format(runtime)
-            # client_cmd += ' --size {}'.format(8000)
-            client_cmd += ' | tee {}/{}-{}_iperf.txt'.format(folder, self.rep_num, client)
-            print('Running \'{}\' on {}'.format(client_cmd, client))
-            clients.append(client.popen(client_cmd, shell=True))
+            if capture_tcp:
+                pcap_filter = ' or '.join(['host {}'.format(intf.IP()) for intf in server.intfList()])
+                pcap_file = '{}/{}-{}_iperf_dump.txt'.format(folder, self.rep_num, client)
+                dump_cmd = ['tcpdump', '-i', 'any', '-w', pcap_file]
+                dump_cmd += shlex.split(pcap_filter)
 
+                dump_cmd = map(str, dump_cmd)
+                info('Running on {}: \'{}\'\n'.format(client, ' '.join(dump_cmd)))
+                client_tcpdumps.append(client.popen(dump_cmd))
+
+            client_cmd = ['iperf3', '-J', '-c', server.IP(), '-t', runtime, '-i', 0.1]
+            # client_cmd += ' --size {}'.format(8000)
+
+            client_cmd = map(str, client_cmd)
+            info('Running on {}: \'{}\'\n'.format(client, ' '.join(client_cmd)))
+
+            file_name = '{}/{}-{}_iperf.txt'.format(folder, self.rep_num, client)
+            with open(file_name, 'w') as f:
+                clients.append(client.popen(client_cmd, stdout=f, stderr=f))
+
+        # Wait for completion and stop all processes
         for process in clients:
-            process.wait()
+            if popen_wait(process, timeout=runtime + 5) is None:
+                error('client popen did not exit correctly\n')
+                process.kill()
+
         for process in servers:
-            os.system('killall -SIGINT iperf')
+            # os.system('killall -SIGINT iperf3')
             process.send_signal(signal.SIGINT)
             # print(process.communicate()[0])
-        time.sleep(1)
-        os.system('killall -9 iperf')
+            if popen_wait(process, timeout=1) is None:
+                error('server popen did not exit correctly\n')
+                process.kill()
 
-        print('Done with experiment\n' + '.'*80 + '\n')
+        for process in client_tcpdumps:
+            process.send_signal(signal.SIGINT)
+            if popen_wait(process, timeout=1) is None:
+                error('tcp_dump popen did not exit correctly\n')
+                process.kill()
+
+        time.sleep(1)
+        # os.system('killall -9 iperf3')
+        # os.system('killall -9 tcpdump')
+
+        output('Done with experiment\n' + '.'*80 + '\n')
 
     def run(self, runtime=30):
         iperf_pairs = self.get_iperf_pairings()
-        info("Running clients and servers, repetition: {}".format(self.rep_num))
+        info("Running clients and servers, repetition: {}\n".format(self.rep_num))
 
         folder = '{}/{}/{}/{}/{}'.format(self.out_folder, self.topology, self.congestion_control, self.tp_name, self.delay_name)
 
