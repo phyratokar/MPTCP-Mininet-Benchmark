@@ -83,11 +83,11 @@ class MPMininet:
         mininet_host_pairs = map(lambda x: (self.net.get(x[0]), self.net.get(x[1])), pairs)
         return mininet_host_pairs
 
-    def run_iperf(self, runtime=10, skipping=False, capture_tcp=True):
+    def run_iperf(self, runtime=15, skipping=False, capture_tcp=True, time_interval=0.1):
         iperf_pairs = self.get_iperf_pairings()
         folder = '{}/{}/{}/{}/{}'.format(self.out_folder, self.topology, self.congestion_control, self.tp_name, self.delay_name)
 
-        output('Running iperf3, repetition: {}\n'.format(self.rep_num))
+        output('Running iperf3, exp {} repetition: {}\n'.format(folder, self.rep_num))
         if skipping and os.path.isfile('{}/{}-{}_iperf.txt'.format(folder, self.rep_num, 'h2')):
             print('already done.')
             return
@@ -105,7 +105,7 @@ class MPMininet:
 
         # Start processes on client and server
         for _, server in iperf_pairs:
-            server_cmd = ['iperf3', '-s', '-J', '-i', 0.1]
+            server_cmd = ['iperf3', '-s', '-J', '-i', time_interval]
             file_name = '{}/{}-{}_iperf.txt'.format(folder, self.rep_num, server)
 
             server_cmd = map(str, server_cmd)
@@ -125,7 +125,7 @@ class MPMininet:
                 info('Running on {}: \'{}\'\n'.format(client, ' '.join(dump_cmd)))
                 client_tcpdumps.append(client.popen(dump_cmd))
 
-            client_cmd = ['iperf3', '-J', '-c', server.IP(), '-t', runtime, '-i', 0.1]
+            client_cmd = ['iperf3', '-J', '-c', server.IP(), '-t', runtime, '-i', time_interval]
             # client_cmd += ' --size {}'.format(8000)
 
             client_cmd = map(str, client_cmd)
@@ -155,11 +155,11 @@ class MPMininet:
                 error('tcp_dump popen did not exit correctly\n')
                 process.kill()
 
-        time.sleep(1)
+        # time.sleep(1)
         # os.system('killall -9 iperf3')
         # os.system('killall -9 tcpdump')
 
-        output('Done with experiment\n' + '.'*80 + '\n')
+        output('\t\tDone with experiment, cleanup\n')
 
     def run(self, runtime=30):
         iperf_pairs = self.get_iperf_pairings()

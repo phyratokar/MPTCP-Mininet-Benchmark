@@ -27,6 +27,17 @@ def read_json(file_name):
     return config
 
 
+def change_latency_config(config, group_a, value_a, group_b, value_b):
+    for link in config['links']:
+        if 'latency_group' in link['properties']:
+            if link['properties']['latency_group'] == group_a:
+                link['properties']['latency'] = value_a
+            elif link['properties']['latency_group'] == group_b:
+                link['properties']['latency'] = value_b
+            else:
+                raise NotImplementedError('Not yet implemented more than two latency_groups for links. {}'.format(link))
+
+
 def run_latency(topo_name):
     delays = np.arange(0, 102, 20)
 
@@ -104,7 +115,7 @@ def run_tp_fairness(topo_name):
 
                     # Run experiments
                     MPMininet(config, cc_name, delay_name=delay_dir, throughput_name=tp_dir, repetition_number=rep)
-                    return
+                    # return
 
 
 def run_tp_fairness_single(topo_name):
@@ -140,7 +151,7 @@ def main():
     """Create and run multiple link network"""
     if args.all:
         run_latency('two_paths')
-        # run_tp_fairness('mp-vs-sp')
+        run_tp_fairness('mp-vs-sp')
         # run_tp_fairness_single('single_path')
         pass
     else:
