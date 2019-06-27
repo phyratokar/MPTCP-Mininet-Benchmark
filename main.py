@@ -1,7 +1,6 @@
 import copy
 import json
 import os
-import shlex
 from argparse import ArgumentParser
 
 import numpy as np
@@ -108,7 +107,8 @@ def run_tp_fairness(topo_name):
                             else:
                                 raise NotImplementedError('Not yet implemented more than two throughput_groups for links. {}'.format(link))
                         else:
-                            raise
+                            # TODO handle error case
+                            pass
 
                     delay_dir = '{}ms-{}ms'.format(10, 10)
                     tp_dir = '{}Mbps-{}Mbps'.format(tp_a, tp_b)
@@ -151,7 +151,7 @@ def main():
     """Create and run multiple link network"""
     if args.all:
         run_latency('two_paths')
-        run_tp_fairness('mp-vs-sp')
+        # run_tp_fairness('mp-vs-sp')
         # run_tp_fairness_single('single_path')
         pass
     else:

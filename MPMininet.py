@@ -83,7 +83,7 @@ class MPMininet:
         mininet_host_pairs = map(lambda x: (self.net.get(x[0]), self.net.get(x[1])), pairs)
         return mininet_host_pairs
 
-    def run_iperf(self, runtime=15, skipping=False, capture_tcp=True, time_interval=0.1):
+    def run_iperf(self, runtime=15, skipping=False, capture_tcp=True, time_interval=1):
         iperf_pairs = self.get_iperf_pairings()
         folder = '{}/{}/{}/{}/{}'.format(self.out_folder, self.topology, self.congestion_control, self.tp_name, self.delay_name)
 
