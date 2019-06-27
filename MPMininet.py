@@ -140,9 +140,11 @@ class MPMininet:
             if popen_wait(process, timeout=runtime + 5) is None:
                 error('client popen did not exit correctly\n')
                 process.kill()
+                raise RuntimeError(folder, self.rep_num)
             elif process.returncode:
                 print('problem with popen client! Exit code: {}'.format(process.returncode))
                 raise RuntimeError(folder, self.rep_num)
+        time.sleep(2)
 
         for process in servers:
             # os.system('killall -SIGINT iperf3')
@@ -151,8 +153,9 @@ class MPMininet:
             if popen_wait(process, timeout=1) is None:
                 error('server popen did not exit correctly\n')
                 process.kill()
+                raise RuntimeError(folder, self.rep_num)
             elif process.returncode:
-                print('problem with popen client! Exit code: {}'.format(process.returncode))
+                print('problem with popen server! Exit code: {}'.format(process.returncode))
                 raise RuntimeError(folder, self.rep_num)
 
         for process in client_tcpdumps:
@@ -160,9 +163,16 @@ class MPMininet:
             if popen_wait(process, timeout=1) is None:
                 error('tcp_dump popen did not exit correctly\n')
                 process.kill()
-            elif process.returncode:
-                print('problem with popen client! Exit code: {}'.format(process.returncode))
                 raise RuntimeError(folder, self.rep_num)
+            elif process.returncode:
+                print('problem with popen client tcpdum! Exit code: {}'.format(process.returncode))
+                raise RuntimeError(folder, self.rep_num)
+
+        for p in client_tcpdumps + clients + servers:
+            try:
+                p.kill()
+            except OSError:
+                pass
 
         # time.sleep(1)
         # os.system('killall -9 iperf3')
