@@ -190,10 +190,6 @@ if __name__ == '__main__':
                         choices=['shared_link', 'two_paths', 'mp-vs-sp', 'single_path'],
                         default='two_paths')
 
-    parser.add_argument('--asymmetry',
-                        help="How big should the latency differ between paths [1.0-3.0]",
-                        type=float,
-                        default=1.0)
     args = parser.parse_args()
 
     try:

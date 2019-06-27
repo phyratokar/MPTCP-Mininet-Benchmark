@@ -105,7 +105,7 @@ class MPMininet:
 
         # Start processes on client and server
         for _, server in iperf_pairs:
-            server_cmd = ['iperf3', '-s', '-J', '-i', time_interval]
+            server_cmd = ['iperf3', '-s', '--one-off', '-J', '-i', time_interval]
             file_name = '{}/{}-{}_iperf.txt'.format(folder, self.rep_num, server)
 
             server_cmd = map(str, server_cmd)
@@ -140,6 +140,9 @@ class MPMininet:
             if popen_wait(process, timeout=runtime + 5) is None:
                 error('client popen did not exit correctly\n')
                 process.kill()
+            elif process.returncode:
+                print('problem with popen client! Exit code: {}'.format(process.returncode))
+                raise RuntimeError(folder, self.rep_num)
 
         for process in servers:
             # os.system('killall -SIGINT iperf3')
@@ -148,12 +151,18 @@ class MPMininet:
             if popen_wait(process, timeout=1) is None:
                 error('server popen did not exit correctly\n')
                 process.kill()
+            elif process.returncode:
+                print('problem with popen client! Exit code: {}'.format(process.returncode))
+                raise RuntimeError(folder, self.rep_num)
 
         for process in client_tcpdumps:
             process.send_signal(signal.SIGINT)
             if popen_wait(process, timeout=1) is None:
                 error('tcp_dump popen did not exit correctly\n')
                 process.kill()
+            elif process.returncode:
+                print('problem with popen client! Exit code: {}'.format(process.returncode))
+                raise RuntimeError(folder, self.rep_num)
 
         # time.sleep(1)
         # os.system('killall -9 iperf3')
