@@ -6,7 +6,7 @@ from argparse import ArgumentParser
 import numpy as np
 
 from MPMininet import MPMininet
-from MPTopolies import JsonTopo
+from MPTopoligies import JsonTopo
 from mininet.cli import CLI
 from mininet.link import TCLink
 from mininet.net import Mininet
@@ -38,7 +38,7 @@ def change_latency_config(config, group_a, value_a, group_b, value_b):
 
 
 def run_latency(topo_name):
-    delays = np.arange(0, 102, 20)
+    delays = np.arange(0, 102, 10)
 
     for rep in range(3):  # [2:]: # fixme: remove less runs and less cc
         for cc_name in Congestion_control_algorithms:  # [1:]:

@@ -4,7 +4,7 @@ import shlex
 import signal
 import time
 
-from MPTopolies import JsonTopo
+from MPTopoligies import JsonTopo
 from mininet.cli import CLI
 from mininet.log import error, info, output
 from mininet.net import Mininet
@@ -104,7 +104,7 @@ class MPMininet:
 
         # Start processes on client and server
         for _, server in iperf_pairs:
-            server_cmd = [iperf_cmd, '-s', '-i', time_interval] # iperf 3: '--one-off', '-J'
+            server_cmd = [iperf_cmd, '-s', '-y', 'C', '-i', time_interval] # iperf 3: '--one-off', '-J'
             file_name = '{}/{}-{}_iperf.txt'.format(folder, self.rep_num, server)
 
             server_cmd = map(str, server_cmd)
@@ -124,7 +124,7 @@ class MPMininet:
                 info('Running on {}: \'{}\'\n'.format(client, ' '.join(dump_cmd)))
                 client_tcpdumps.append(client.popen(dump_cmd))
 
-            client_cmd = [iperf_cmd, '-J', '-c', server.IP(), '-t', runtime, '-i', time_interval]
+            client_cmd = [iperf_cmd, '-c', server.IP(), '-y', 'C', '-t', runtime, '-i', time_interval] # '-J'
             client_cmd = map(str, client_cmd)
             info('Running on {}: \'{}\'\n'.format(client, ' '.join(client_cmd)))
 
