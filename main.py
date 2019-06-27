@@ -62,7 +62,8 @@ def run_latency(topo_name):
                     tp_dir = '{}Mbps-{}Mbps'.format(10, 10)
 
                     # Run experiments
-                    MPMininet(config, cc_name, delay_name=delay_dir, throughput_name=tp_dir, repetition_number=rep)
+                    MPMininet(config, cc_name, use_tcpdump=args.dtcp, delay_name=delay_dir,
+                              throughput_name=tp_dir, repetition_number=rep)
                     # return
 
 
@@ -114,7 +115,7 @@ def run_tp_fairness(topo_name):
                     tp_dir = '{}Mbps-{}Mbps'.format(tp_a, tp_b)
 
                     # Run experiments
-                    MPMininet(config, cc_name, delay_name=delay_dir, throughput_name=tp_dir, repetition_number=rep)
+                    MPMininet(config, cc_name, delay_name=delay_dir, use_tcpdump=args.dtcp, throughput_name=tp_dir, repetition_number=rep)
                     # return
 
 
@@ -144,16 +145,20 @@ def run_tp_fairness_single(topo_name):
 
                 # Run experiments
 
-                MPMininet(config, cc_name, delay_name=delay_dir, throughput_name=tp_dir, repetition_number=rep)
+                MPMininet(config, cc_name, delay_name=delay_dir, use_tcpdump=args.dtcp, throughput_name=tp_dir, repetition_number=rep)
 
 
 def main():
     """Create and run multiple link network"""
-    if args.all:
-        run_latency('two_paths')
-        # run_tp_fairness('mp-vs-sp')
-        # run_tp_fairness_single('single_path')
-        pass
+    # run_latency('two_paths')
+    # run_tp_fairness('mp-vs-sp')
+    # run_tp_fairness_single('single_path')
+    if args.run:
+        if args.run == 'de':
+            run_latency(args.topo)
+        elif args.run == 'tp':
+            run_tp_fairness(args.topo)
+            # TODO distinguish between multi link and single link case
     else:
         config = read_json('topologies/' + args.topo + '.json')
         topo = JsonTopo(config)
@@ -172,9 +177,14 @@ def main():
 if __name__ == '__main__':
     parser = ArgumentParser(description="MPTCP TP and Latency tests")
 
-    parser.add_argument('--all', '-a',
+    parser.add_argument('--dtcp', '-d',
                         action='store_true',
-                        help="Run all available tests")
+                        help="Capture connections with tcpdump")
+
+    parser.add_argument('--run',
+                        choices=['de', 'tp'],
+                        required=True,
+                        help="Which tsks to run")
 
     parser.add_argument('--log',
                         choices=['info', 'debug', 'output', 'warning', 'error', 'critical'],
@@ -188,6 +198,7 @@ if __name__ == '__main__':
     parser.add_argument('--topo',
                         help="Topology to use",
                         choices=['shared_link', 'two_paths', 'mp-vs-sp', 'single_path'],
+                        required=True,
                         default='two_paths')
 
     args = parser.parse_args()

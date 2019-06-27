@@ -22,8 +22,10 @@ def popen_wait(popen_task, timeout=-1):
 
 class MPMininet:
     """Create and run multiple paths network"""
-    def __init__(self, json_config, congestion_control, delay_name, throughput_name, repetition_number=0, start_cli=False):
+    def __init__(self, json_config, congestion_control, delay_name, throughput_name, repetition_number=0,
+                 start_cli=False, use_tcpdump=False):
         self.config = json_config
+        self.use_tcpdump = use_tcpdump
         self.congestion_control = congestion_control
         self.delay_name, self.tp_name = delay_name, throughput_name
         self.rep_num = repetition_number
@@ -83,11 +85,11 @@ class MPMininet:
         mininet_host_pairs = map(lambda x: (self.net.get(x[0]), self.net.get(x[1])), pairs)
         return mininet_host_pairs
 
-    def run_iperf(self, runtime=15, skipping=False, capture_tcp=True, time_interval=1):
+    def run_iperf(self, runtime=15, skipping=False, time_interval=1, iperf_cmd='iperf'):
         iperf_pairs = self.get_iperf_pairings()
         folder = '{}/{}/{}/{}/{}'.format(self.out_folder, self.topology, self.congestion_control, self.tp_name, self.delay_name)
 
-        output('Running iperf3, exp {} repetition: {}\n'.format(folder, self.rep_num))
+        output('Running iperf_cmd, exp {} repetition: {}\n'.format(folder, self.rep_num))
         if skipping and os.path.isfile('{}/{}-{}_iperf.txt'.format(folder, self.rep_num, 'h2')):
             print('already done.')
             return
@@ -95,17 +97,14 @@ class MPMininet:
         if not os.path.exists(folder):
             os.makedirs(folder)
 
-        # TODO: start tcpdump per sending client
-        # TODO: start iperf client per client and wait for completion of them all, throw error if any of them is not
-        # connected or encounters issue
-
+        # store for popen handles
         servers = []
         clients = []
         client_tcpdumps = []
 
         # Start processes on client and server
         for _, server in iperf_pairs:
-            server_cmd = ['iperf3', '-s', '--one-off', '-J', '-i', time_interval]
+            server_cmd = [iperf_cmd, '-s', '-i', time_interval] # iperf 3: '--one-off', '-J'
             file_name = '{}/{}-{}_iperf.txt'.format(folder, self.rep_num, server)
 
             server_cmd = map(str, server_cmd)
@@ -115,7 +114,7 @@ class MPMininet:
         time.sleep(1)
 
         for client, server in iperf_pairs:
-            if capture_tcp:
+            if self.use_tcpdump:
                 pcap_filter = ' or '.join(['host {}'.format(intf.IP()) for intf in server.intfList()])
                 pcap_file = '{}/{}-{}_iperf_dump.txt'.format(folder, self.rep_num, client)
                 dump_cmd = ['tcpdump', '-i', 'any', '-w', pcap_file]
@@ -125,9 +124,7 @@ class MPMininet:
                 info('Running on {}: \'{}\'\n'.format(client, ' '.join(dump_cmd)))
                 client_tcpdumps.append(client.popen(dump_cmd))
 
-            client_cmd = ['iperf3', '-J', '-c', server.IP(), '-t', runtime, '-i', time_interval]
-            # client_cmd += ' --size {}'.format(8000)
-
+            client_cmd = [iperf_cmd, '-J', '-c', server.IP(), '-t', runtime, '-i', time_interval]
             client_cmd = map(str, client_cmd)
             info('Running on {}: \'{}\'\n'.format(client, ' '.join(client_cmd)))
 
@@ -144,7 +141,7 @@ class MPMininet:
             elif process.returncode:
                 print('problem with popen client! Exit code: {}'.format(process.returncode))
                 raise RuntimeError(folder, self.rep_num)
-        time.sleep(2)
+        # time.sleep(1)
 
         for process in servers:
             # os.system('killall -SIGINT iperf3')
