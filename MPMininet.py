@@ -105,7 +105,7 @@ class MPMininet:
         # Start processes on client and server
         for _, server in iperf_pairs:
             server_cmd = [iperf_cmd, '-s', '-y', 'C', '-i', time_interval] # iperf 3: '--one-off', '-J'
-            file_name = '{}/{}-{}_iperf.txt'.format(folder, self.rep_num, server)
+            file_name = '{}/{}-{}_iperf.csv'.format(folder, self.rep_num, server)
 
             server_cmd = map(str, server_cmd)
             info('Running on {}: \'{}\'\n'.format(server, ' '.join(server_cmd)))
@@ -116,7 +116,7 @@ class MPMininet:
         for client, server in iperf_pairs:
             if self.use_tcpdump:
                 pcap_filter = ' or '.join(['host {}'.format(intf.IP()) for intf in server.intfList()])
-                pcap_file = '{}/{}-{}_iperf_dump.txt'.format(folder, self.rep_num, client)
+                pcap_file = '{}/{}-{}_iperf_dump.pcap'.format(folder, self.rep_num, client)
                 dump_cmd = ['tcpdump', '-i', 'any', '-w', pcap_file]
                 dump_cmd += shlex.split(pcap_filter)
 
@@ -128,7 +128,7 @@ class MPMininet:
             client_cmd = map(str, client_cmd)
             info('Running on {}: \'{}\'\n'.format(client, ' '.join(client_cmd)))
 
-            file_name = '{}/{}-{}_iperf.txt'.format(folder, self.rep_num, client)
+            file_name = '{}/{}-{}_iperf.csv'.format(folder, self.rep_num, client)
             with open(file_name, 'w') as f:
                 clients.append(client.popen(client_cmd, stdout=f, stderr=f))
 

@@ -86,6 +86,8 @@ def run_tp_fairness(topo_name):
     orig_config = read_json('topologies/{}.json'.format(topo_name))
     tp_groups = extract_groups(orig_config, kind='tp')
 
+    print('we have {} tp groups'.format(len(tp_groups)))
+
     # tps_a = [5, 7, 9, 11, 12, 13, 14, 15, 16, 17, 18, 19, 21, 23, 25]
     # tps_b = [5, 7, 9, 11, 12, 13, 14, 15, 16, 17, 18, 19, 21, 23, 25]
 
@@ -183,7 +185,6 @@ if __name__ == '__main__':
 
     parser.add_argument('--run',
                         choices=['de', 'tp'],
-                        required=True,
                         help="Which tsks to run")
 
     parser.add_argument('--log',
