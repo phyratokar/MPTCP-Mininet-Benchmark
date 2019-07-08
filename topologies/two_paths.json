@@ -70,7 +70,7 @@
       "target": "s2",
       "cost": 1.000,
       "properties": {
-        "latency": 100.000,
+        "latency": 100.0,
         "latency_group": "a",
         "latency_text": "ms",
         "throughput": 10,
@@ -83,7 +83,7 @@
       "target": "s4",
       "cost": 1.000,
       "properties": {
-        "latency": 100.000,
+        "latency": 100.0,
         "latency_group": "b",
         "latency_text": "ms",
         "throughput": 10,

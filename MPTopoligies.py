@@ -75,9 +75,9 @@ class JsonTopo(MPTopo):
                 exit(1)
 
             hs, hd = nodes.get(src), nodes.get(dst)
-            linkopts = dict(bw=throughput, delay='{}ms'.format(latency))
-            link = self.addLink(hs, hd, **linkopts)
-            info('Link added {}'.format(link))
+            linkopts = dict(bw=throughput, delay='{}ms'.format(latency), jitter='0.25ms')
+            self.addLink(hs, hd, **linkopts)
+            info('Link added {}-{}, options {}\n'.format(hs, hd, linkopts))
 
         # print('\n'.join(['{} <-> {}, \tlatency: {}, \tbandwidth: {}Mbps'
         #                 .format(s, d, c['delay'], c['bw']) for s, d, c in self.links(sort=True, withInfo=True)]))
