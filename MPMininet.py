@@ -106,11 +106,13 @@ class MPMininet:
         for _, server in iperf_pairs:
             server_cmd = [iperf_cmd, '-s', '-4', '--one-off', '-i', time_interval] # iperf 3: '--one-off', '-J' iperf: '-y', 'C',
             file_name = '{}/{}-{}_iperf.csv'.format(folder, self.rep_num, server)
+            server_cmd += ['&>', file_name]
 
             server_cmd = map(str, server_cmd)
             info('Running on {}: \'{}\'\n'.format(server, ' '.join(server_cmd)))
-            with open(file_name, 'w') as f:
-                servers.append(server.popen(server_cmd, stdout=f, stderr=f))
+            #with open(file_name, 'w') as f:
+            #    servers.append(server.popen(server_cmd, stdout=f, stderr=f))
+            server.sendCmd(server_cmd)
         time.sleep(1)
 
         for client, server in iperf_pairs:
@@ -125,12 +127,15 @@ class MPMininet:
                 client_tcpdumps.append(client.popen(dump_cmd))
 
             client_cmd = [iperf_cmd, '-c', server.IP(), '-t', runtime, '-i', time_interval, '-4'] # '-J' iperf: '-y', 'C',
+            file_name = '{}/{}-{}_iperf.csv'.format(folder, self.rep_num, client)
+            # client_cmd += ['&>', file_name]
+
             client_cmd = map(str, client_cmd)
             info('Running on {}: \'{}\'\n'.format(client, ' '.join(client_cmd)))
 
-            file_name = '{}/{}-{}_iperf.csv'.format(folder, self.rep_num, client)
             with open(file_name, 'w') as f:
                 clients.append(client.popen(client_cmd, stdout=f, stderr=f))
+            #clients.append(client.popen(client_cmd))
 
         # Wait for completion and stop all processes
         for process in clients:
