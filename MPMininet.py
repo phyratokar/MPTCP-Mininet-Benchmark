@@ -3,6 +3,7 @@ import os
 import shlex
 import signal
 import time
+import subprocess
 
 from MPTopoligies import JsonTopo
 from mininet.cli import CLI
@@ -18,6 +19,17 @@ def popen_wait(popen_task, timeout=-1):
         time.sleep(delay)
         timeout += delay
     return popen_task.poll() is not None
+
+
+def system_call(cmd, ignore_codes=None):
+    try:
+        retcode = subprocess.call(shlex.split(cmd))
+        if retcode < 0:
+            error('Child was terminated by signal {}\n'.format(-retcode))
+        elif retcode > 0 and retcode not in ignore_codes:
+            error('Child returned {}\n'.format(retcode))
+    except OSError as e:
+        error('Execution failed: {}\n'.format(e))
 
 
 class MPMininet:
@@ -97,11 +109,6 @@ class MPMininet:
         if not os.path.exists(folder):
             os.makedirs(folder)
 
-        # store for popen handles
-        servers = []
-        clients = []
-        client_tcpdumps = []
-
         # Start processes on client and server
         for _, server in iperf_pairs:
             server_cmd = [iperf_cmd, '-s', '-4', '--one-off', '-i', time_interval] # iperf 3: '--one-off', '-J' iperf: '-y', 'C',
@@ -110,8 +117,6 @@ class MPMininet:
 
             server_cmd = map(str, server_cmd)
             info('Running on {}: \'{}\'\n'.format(server, ' '.join(server_cmd)))
-            #with open(file_name, 'w') as f:
-            #    servers.append(server.popen(server_cmd, stdout=f, stderr=f))
             server.sendCmd(server_cmd)
         time.sleep(1)
 
@@ -125,7 +130,6 @@ class MPMininet:
 
                 dump_cmd = map(str, dump_cmd)
                 info('Running on {}: \'{}\'\n'.format(client, ' '.join(dump_cmd)))
-                # client_tcpdumps.append(client.popen(dump_cmd))
                 client.cmd(dump_cmd)
 
             client_cmd = [iperf_cmd, '-c', server.IP(), '-t', runtime, '-i', time_interval, '-4'] # '-J' iperf: '-y', 'C',
@@ -135,64 +139,26 @@ class MPMininet:
             client_cmd = map(str, client_cmd)
             info('Running on {}: \'{}\'\n'.format(client, ' '.join(client_cmd)))
 
-            #with open(file_name, 'w') as f:
-            #    clients.append(client.popen(client_cmd))
             client.sendCmd(client_cmd)
 
+        # Wait for completion and stop all processes
         for client, _ in iperf_pairs:
             o = client.waitOutput()
-            print(repr(o))
             # make sure o[-3:-2] is exit code 0!
             if o[-3:-2] not in ['0']:
-                raise RuntimeError('Client iperf did not exit correctly, has error {}'.format(o[-3:-2]))
+                error('client popen did not exit correctly\n')
+                raise RuntimeError('Client iperf did not exit correctly, error code {}\n'.format(o[-3:-2]),
+                                   folder, self.rep_num)
 
             # interrupt tcpdump
             client.cmd('pkill -SIGINT tcpdump')
+        for _, server in iperf_pairs:
+            server.sendInt()
 
-        # Wait for completion and stop all processes
-        for process in clients:
-            if popen_wait(process, timeout=runtime + 5) is None:
-                error('client popen did not exit correctly\n')
-                process.kill()
-                raise RuntimeError(folder, self.rep_num)
-            elif process.returncode:
-                print('problem with popen client! Exit code: {}'.format(process.returncode))
-                raise RuntimeError(folder, self.rep_num)
-        time.sleep(0)
-
-        for process in servers:
-            # os.system('killall -SIGINT iperf3')
-            process.send_signal(signal.SIGINT)
-            # print(process.communicate()[0])
-            if popen_wait(process, timeout=1) is None:
-                error('server popen did not exit correctly\n')
-                process.kill()
-                raise RuntimeError(folder, self.rep_num)
-            elif process.returncode != 0 and process.returncode != 1:
-                print('problem with popen server! Exit code: {}'.format(process.returncode))
-                raise RuntimeError(folder, self.rep_num)
-
-        for process in client_tcpdumps:
-            process.send_signal(signal.SIGINT)
-            if popen_wait(process, timeout=1) is None:
-                error('tcp_dump popen did not exit correctly\n')
-                process.kill()
-                raise RuntimeError(folder, self.rep_num)
-            elif process.returncode:
-                print('problem with popen client tcpdum! Exit code: {}'.format(process.returncode))
-                raise RuntimeError(folder, self.rep_num)
-
-        for p in client_tcpdumps + clients + servers:
-            try:
-                p.kill()
-            except OSError:
-                pass
-
-        # time.sleep(1)
-        os.system('killall -9 iperf3')
-        os.system('killall -9 tcpdump')
-
+        time.sleep(1)
         output('\t\tDone with experiment, cleanup\n')
+        system_call('pkill iperf3', ignore_codes=[1])
+        system_call('pkill tcpdump', ignore_codes=[1])
 
     def run(self, runtime=30):
         iperf_pairs = self.get_iperf_pairings()
