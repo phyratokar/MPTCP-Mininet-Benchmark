@@ -214,4 +214,4 @@ if __name__ == '__main__':
         print("-"*80)
         import traceback
         traceback.print_exc()
-        os.system("killall -9 top bwm-ng tcpdump cat mnexec iperf; mn -c")
+        os.system("killall -9 top bwm-ng tcpdump cat mnexec iperf iperf3; mn -c")

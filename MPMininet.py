@@ -121,21 +121,33 @@ class MPMininet:
                 pcap_file = '{}/{}-{}_iperf_dump.pcap'.format(folder, self.rep_num, client)
                 dump_cmd = ['tcpdump', '-i', 'any', '-w', pcap_file]
                 dump_cmd += shlex.split(pcap_filter)
+                dump_cmd += ['&>', '/dev/null', '&']
 
                 dump_cmd = map(str, dump_cmd)
                 info('Running on {}: \'{}\'\n'.format(client, ' '.join(dump_cmd)))
-                client_tcpdumps.append(client.popen(dump_cmd))
+                # client_tcpdumps.append(client.popen(dump_cmd))
+                client.cmd(dump_cmd)
 
             client_cmd = [iperf_cmd, '-c', server.IP(), '-t', runtime, '-i', time_interval, '-4'] # '-J' iperf: '-y', 'C',
             file_name = '{}/{}-{}_iperf.csv'.format(folder, self.rep_num, client)
-            # client_cmd += ['&>', file_name]
+            client_cmd += ['&>', file_name, ';', 'echo', '$?']
 
             client_cmd = map(str, client_cmd)
             info('Running on {}: \'{}\'\n'.format(client, ' '.join(client_cmd)))
 
-            with open(file_name, 'w') as f:
-                clients.append(client.popen(client_cmd, stdout=f, stderr=f))
-            #clients.append(client.popen(client_cmd))
+            #with open(file_name, 'w') as f:
+            #    clients.append(client.popen(client_cmd))
+            client.sendCmd(client_cmd)
+
+        for client, _ in iperf_pairs:
+            o = client.waitOutput()
+            print(repr(o))
+            # make sure o[-3:-2] is exit code 0!
+            if o[-3:-2] not in ['0']:
+                raise RuntimeError('Client iperf did not exit correctly, has error {}'.format(o[-3:-2]))
+
+            # interrupt tcpdump
+            client.cmd('pkill -SIGINT tcpdump')
 
         # Wait for completion and stop all processes
         for process in clients:
@@ -177,8 +189,8 @@ class MPMininet:
                 pass
 
         # time.sleep(1)
-        # os.system('killall -9 iperf3')
-        # os.system('killall -9 tcpdump')
+        os.system('killall -9 iperf3')
+        os.system('killall -9 tcpdump')
 
         output('\t\tDone with experiment, cleanup\n')
 
