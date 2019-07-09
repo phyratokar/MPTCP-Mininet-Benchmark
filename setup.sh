@@ -18,6 +18,7 @@ git checkout -b 2.2.2 2.2.2
 cd ..
 sh ./mininet/util/install.sh -a
 
-apt-get install iperf3 tcpdump
+apt-get install iperf3 tcpdump htop python-pip
+pip install numpy
 
 echo "Please reboot the system to enable the mptcp kernel, Mininet should be installed and working."

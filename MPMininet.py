@@ -85,7 +85,7 @@ class MPMininet:
         mininet_host_pairs = map(lambda x: (self.net.get(x[0]), self.net.get(x[1])), pairs)
         return mininet_host_pairs
 
-    def run_iperf(self, runtime=15, skipping=False, time_interval=1, iperf_cmd='iperf'):
+    def run_iperf(self, runtime=15, skipping=False, time_interval=1, iperf_cmd='iperf3'):
         iperf_pairs = self.get_iperf_pairings()
         folder = '{}/{}/{}/{}/{}'.format(self.out_folder, self.topology, self.congestion_control, self.tp_name, self.delay_name)
 
@@ -104,7 +104,7 @@ class MPMininet:
 
         # Start processes on client and server
         for _, server in iperf_pairs:
-            server_cmd = [iperf_cmd, '-s', '-y', 'C', '-i', time_interval] # iperf 3: '--one-off', '-J'
+            server_cmd = [iperf_cmd, '-s', '-4', '--one-off', '-i', time_interval] # iperf 3: '--one-off', '-J' iperf: '-y', 'C',
             file_name = '{}/{}-{}_iperf.csv'.format(folder, self.rep_num, server)
 
             server_cmd = map(str, server_cmd)
@@ -124,7 +124,7 @@ class MPMininet:
                 info('Running on {}: \'{}\'\n'.format(client, ' '.join(dump_cmd)))
                 client_tcpdumps.append(client.popen(dump_cmd))
 
-            client_cmd = [iperf_cmd, '-c', server.IP(), '-y', 'C', '-t', runtime, '-i', time_interval] # '-J'
+            client_cmd = [iperf_cmd, '-c', server.IP(), '-t', runtime, '-i', time_interval, '-4'] # '-J' iperf: '-y', 'C',
             client_cmd = map(str, client_cmd)
             info('Running on {}: \'{}\'\n'.format(client, ' '.join(client_cmd)))
 
@@ -141,7 +141,7 @@ class MPMininet:
             elif process.returncode:
                 print('problem with popen client! Exit code: {}'.format(process.returncode))
                 raise RuntimeError(folder, self.rep_num)
-        # time.sleep(1)
+        time.sleep(0)
 
         for process in servers:
             # os.system('killall -SIGINT iperf3')
@@ -151,7 +151,7 @@ class MPMininet:
                 error('server popen did not exit correctly\n')
                 process.kill()
                 raise RuntimeError(folder, self.rep_num)
-            elif process.returncode:
+            elif process.returncode != 0 and process.returncode != 1:
                 print('problem with popen server! Exit code: {}'.format(process.returncode))
                 raise RuntimeError(folder, self.rep_num)
 
