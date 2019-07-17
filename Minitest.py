@@ -19,8 +19,8 @@ import os
 
 from MPTopoligies import JsonTopo
 from mininet.cli import CLI
-from mininet.link import TCLink
 from mininet.net import Mininet
+from mininet.link import TCLink
 from mininet.log import setLogLevel
 
 
