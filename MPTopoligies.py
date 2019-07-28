@@ -1,19 +1,3 @@
-"""Custom topology example
-
-Two directly connected switches plus a host for each switch:
-
-   host --- switch --- switch --- host
-
-Adding the 'topos' dict with a key/value pair to generate our newly defined
-topology enables one to pass in '--topo=mytopo' from the command line.
-
-
-Hosts need to be names 'hx' where x is a number ('h1', 'h33', etc).
-
-IP schema:
-    10.0.x.y    where y denotes the host id and x the interface id, i.e. h1-eth0 has 10.0.0.1 and h2-eth2 has 10.0.1.2
-"""
-
 from mininet.log import info, error
 from mininet.topo import Topo
 
@@ -21,9 +5,12 @@ from mininet.topo import Topo
 class MPTopo(Topo):
     """
     Parent abstract class which enables the child topologies to make the hosts mptcp ready.
+    IP schema:
+        10.0.x.y: where y denotes the host id and x the interface id, e.g. h1-eth0 has 10.0.0.1 and h2-eth2 has 10.0.1.2
     """
     HOST_IP = '10.0.{0}.{1}'
     HOST_MAC = '00:00:00:00:{0:02x}:{1:02x}'
+    JITTER = '0.001ms'
 
     def _setup_routing_per_host(self, host):
         # Manually set the ip addresses of the interfaces
@@ -75,7 +62,7 @@ class JsonTopo(MPTopo):
                 exit(1)
 
             hs, hd = nodes.get(src), nodes.get(dst)
-            linkopts = dict(bw=throughput, delay='{}ms'.format(latency), jitter='0.25ms')
+            linkopts = dict(bw=throughput, delay='{}ms'.format(latency), jitter=self.JITTER)
             self.addLink(hs, hd, **linkopts)
             info('Link added {}-{}, options {}\n'.format(hs, hd, linkopts))
 

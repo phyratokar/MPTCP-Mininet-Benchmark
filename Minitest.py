@@ -1,27 +1,10 @@
-"""Custom topology example
-
-Two directly connected switches plus a host for each switch:
-
-   host --- switch --- switch --- host
-
-Adding the 'topos' dict with a key/value pair to generate our newly defined
-topology enables one to pass in '--topo=mytopo' from the command line.
-
-
-Hosts need to be names 'hx' where x is a number ('h1', 'h33', etc).
-
-IP schema:
-    10.0.x.y    where y denotes the host id and x the interface id, i.e. h1-eth0 has 10.0.0.1 and h2-eth2 has 10.0.1.2
-"""
-
-from mininet.topo import Topo
 import os
+import time
 
-from MPTopoligies import JsonTopo
 from mininet.cli import CLI
 from mininet.net import Mininet
+from mininet.topo import Topo
 from mininet.link import TCLink
-from mininet.log import setLogLevel
 
 
 class MPTopo(Topo):
@@ -43,11 +26,11 @@ class MPTopo(Topo):
             # set IP and MAC of host
             host.intf(intf_name).config(ip='{}/24'.format(ip), mac=mac)
 
-            # Setup routing tables to so the kernel routes different source addresses through different interfaces.
-            # See http://multipath-tcp.org/pmwiki.php/Users/ConfigureRouting for information
-            host.cmd('ip rule add from {} table {}'.format(ip, i+1))
-            host.cmd('ip route add {}/24 dev {} scope link table {}'.format(gateway, intf_name, i+1))
-            host.cmd('ip route add default via {} dev {} table {}'.format(gateway, intf_name, i+1))
+            ## Setup routing tables to so the kernel routes different source addresses through different interfaces.
+            ## See http://multipath-tcp.org/pmwiki.php/Users/ConfigureRouting for information
+            # host.cmd('ip rule add from {} table {}'.format(ip, i+1))
+            # host.cmd('ip route add {}/24 dev {} scope link table {}'.format(gateway, intf_name, i+1))
+            # host.cmd('ip route add default via {} dev {} table {}'.format(gateway, intf_name, i+1))
 
     def setup_routing(self, net):
         for host in self.hosts():
@@ -61,7 +44,7 @@ class SingleMPFlowTopo(MPTopo):
       \--- s3 --- s4 ---/
     """
 
-    def build(self):
+    def build(self, bw_restriction_on_first_leg):
         # Add hosts and switches
         h1 = self.addHost('h1')
         h2 = self.addHost('h2')
@@ -71,44 +54,63 @@ class SingleMPFlowTopo(MPTopo):
         s4 = self.addSwitch('s4')
 
         # Add links
-        # , loss=10, max_queue_size=1000, use_htb=True
-        linkopts = dict(bw=10, delay='50ms')
-        linkopts_slow = dict(bw=10, delay='51ms')
-        self.addLink(h1, s1, bw=10) #, **linkopts_slow)
-        self.addLink(h1, s3, bw=10) #, **linkopts)
+        if bw_restriction_on_first_leg:
+            print('Adding bw restriction to first leg')
+            self.addLink(h1, s1, bw=10)  # , delay='0ms', jitter='0.25ms')
+            self.addLink(h1, s3, bw=10)  # , delay='0ms', jitter='0.25ms')
 
-        self.addLink(s1, s2, **linkopts_slow)
-        self.addLink(s3, s4, **linkopts)
+        else:
+            print('NOT adding bw restriction to first leg')
+            self.addLink(h1, s1)  # , delay='0ms', jitter='0.25ms')
+            self.addLink(h1, s3)  # , delay='0ms', jitter='0.25ms')
 
-        self.addLink(s2, h2) #, **linkopts_slow)
-        self.addLink(s4, h2) #, **linkopts)
+        self.addLink(s1, s2, bw=10, delay='50ms')
+        self.addLink(s3, s4, bw=10, delay='50ms')
+
+        self.addLink(s2, h2)
+        self.addLink(s4, h2)
 
 
 def main():
-    """Create and run multiple link network"""
-    # run_latency('two_paths')
-    # run_tp_fairness('mp-vs-sp')
-    # run_tp_fairness_single('single_path')
+    # Making sure MPTCP is enabled on system and congestion control algorithm modules are loaded
+    os.system('modprobe mptcp_balia; modprobe mptcp_wvegas; modprobe mptcp_olia; modprobe mptcp_coupled')
+    os.system('sysctl -w net.mptcp.mptcp_enabled=1')
+    os.system('sysctl -w net.mptcp.mptcp_path_manager=fullmesh')
+    os.system('sysctl -w net.mptcp.mptcp_scheduler=default')
 
-    topo = SingleMPFlowTopo()
+    for bw_on_first_leg in [True, False]:
+        # Start Mininet
+        topo = SingleMPFlowTopo(bw_restriction_on_first_leg=bw_on_first_leg)
+        net = Mininet(topo=topo, link=TCLink)
 
-    # add host=CPULimitedHost if applicable
-    net = Mininet(topo=topo, link=TCLink)
-    topo.setup_routing(net)
-    net.start()
+        # make sure every host has two IPs assigned
+        topo.setup_routing(net)
 
-    CLI(net)
+        net.start()
+        time.sleep(1)
 
-    net.stop()
+        # Test throughput for different configurations
+        for cc in ['lia', 'olia', 'balia', 'wvegas']:
+            print('\n#### Testing bandwidth for {} (restriction on first leg: {})####'.format(cc, bw_on_first_leg))
+
+            # set congestion control algoritm
+            os.system('sysctl -w net.ipv4.tcp_congestion_control={}'.format(cc))
+
+            # test bandwidth between the two hosts
+            src = net.get('h1')
+            dst = net.get('h2')
+            serverbw, _clientbw = net.iperf([src, dst], seconds=10)
+            # print('BW on Server: {}'.format(serverbw))
+
+        # CLI(net)
+
+        net.stop()
 
 
 if __name__ == '__main__':
-
     try:
         main()
     except:
-        print("-" * 80)
-        print("Caught exception.  Cleaning up...")
         print("-"*80)
         import traceback
         traceback.print_exc()

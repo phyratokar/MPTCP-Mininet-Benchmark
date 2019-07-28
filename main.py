@@ -1,18 +1,30 @@
 import copy
 import json
 import os
+import subprocess
 from argparse import ArgumentParser
 
 import numpy as np
 
-from MPMininet import MPMininet
-from MPTopoligies import JsonTopo
 from mininet.cli import CLI
 from mininet.link import TCLink
-from mininet.net import Mininet
 from mininet.log import setLogLevel
+from mininet.net import Mininet
+
+from MPMininet import MPMininet
+from MPTopoligies import JsonTopo
 
 Congestion_control_algorithms = ['lia', 'olia', 'balia', 'wvegas', 'cubic']
+
+
+def check_system():
+    out = subprocess.check_output('mn --version', shell=True, stderr=subprocess.STDOUT).replace('\n', '')
+    if out.startswith('2.3.'):
+        print('Attention, starting with Mininet version {}, for longer runs version 2.3.x is required!'.format(out))
+
+    if not os.path.exists('/proc/sys/net/mptcp/'):
+        raise OSError('MPTCP does not seem to be installed on the system, '
+                      'please verify that the kernel supports MPTCP.')
 
 
 def read_json(file_name):
@@ -152,6 +164,8 @@ def run_tp_fairness_single(topo_name):
 
 def main():
     """Create and run multiple link network"""
+    check_system()
+
     # run_latency('two_paths')
     # run_tp_fairness('mp-vs-sp')
     # run_tp_fairness_single('single_path')

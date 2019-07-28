@@ -43,7 +43,8 @@ class MPMininet:
         self.rep_num = repetition_number
         self.topology = json_config['topology_id']
         self.net = None
-        self.out_folder = './logs'
+        self.base_folder = './logs'
+        self.out_folder = '{}/{}/{}/{}/{}'.format(self.base_folder, self.topology, self.congestion_control, self.tp_name, self.delay_name)
         self.start(start_cli)
 
     def start(self, cli):
@@ -61,6 +62,8 @@ class MPMininet:
 
         # self.run()
         self.run_iperf()
+
+        self.calculate_rtt(del_pcap=False)  # TODO change to actual flag deleting pcap files
 
         # CLI(self.net)
         self.net.stop()
@@ -97,22 +100,33 @@ class MPMininet:
         mininet_host_pairs = map(lambda x: (self.net.get(x[0]), self.net.get(x[1])), pairs)
         return mininet_host_pairs
 
-    def run_iperf(self, runtime=15, skipping=False, time_interval=1, iperf_cmd='iperf3'):
-        iperf_pairs = self.get_iperf_pairings()
-        folder = '{}/{}/{}/{}/{}'.format(self.out_folder, self.topology, self.congestion_control, self.tp_name, self.delay_name)
+    def run_iperf(self, runtime=15, skipping=False, time_interval=1):
+        """
+        Starting iperf on appropriate hosts using the cmp interface provided by minient.
 
-        output('Running iperf_cmd, exp {} repetition: {}\n'.format(folder, self.rep_num))
-        if skipping and os.path.isfile('{}/{}-{}_iperf.txt'.format(folder, self.rep_num, 'h2')):
+        Note: Mininet also exposes a popen mechanism for executing commands on any node. I encountered issues when using
+            it. Somehow the many popen commands lead to iperf3 having a bufferoverflow exception and too many file
+            handles beeing open after many build up and tear downs of mininet.
+
+        :param runtime:     how long [seconds] to run iperf
+        :param skipping:    should already executed experiments be skipped
+        :param time_interval: time step between iperf output lines
+        :return: None
+        """
+        iperf_pairs = self.get_iperf_pairings()
+
+        output('Running iperf_cmd, exp {} repetition: {}\n'.format(self.out_folder, self.rep_num))
+        if skipping and os.path.isfile('{}/{}-{}_iperf.txt'.format(self.out_folder, self.rep_num, 'h2')):
             print('already done.')
             return
 
-        if not os.path.exists(folder):
-            os.makedirs(folder)
+        if not os.path.exists(self.out_folder):
+            os.makedirs(self.out_folder)
 
         # Start processes on client and server
         for _, server in iperf_pairs:
-            server_cmd = [iperf_cmd, '-s', '-4', '--one-off', '-i', time_interval] # iperf 3: '--one-off', '-J' iperf: '-y', 'C',
-            file_name = '{}/{}-{}_iperf.csv'.format(folder, self.rep_num, server)
+            server_cmd = ['iperf3', '-s', '-4', '--one-off', '-i', time_interval] # iperf 3: '--one-off', '-J' iperf: '-y', 'C',
+            file_name = '{}/{}-{}_iperf.csv'.format(self.out_folder, self.rep_num, server)
             server_cmd += ['&>', file_name]
 
             server_cmd = map(str, server_cmd)
@@ -123,7 +137,7 @@ class MPMininet:
         for client, server in iperf_pairs:
             if self.use_tcpdump:
                 pcap_filter = ' or '.join(['host {}'.format(intf.IP()) for intf in server.intfList()])
-                pcap_file = '{}/{}-{}_iperf_dump.pcap'.format(folder, self.rep_num, client)
+                pcap_file = '{}/{}-{}_iperf_dump.pcap'.format(self.out_folder, self.rep_num, client)
                 dump_cmd = ['tcpdump', '-i', 'any', '-w', pcap_file]
                 dump_cmd += shlex.split(pcap_filter)
                 dump_cmd += ['&>', '/dev/null', '&']
@@ -132,8 +146,8 @@ class MPMininet:
                 info('Running on {}: \'{}\'\n'.format(client, ' '.join(dump_cmd)))
                 client.cmd(dump_cmd)
 
-            client_cmd = [iperf_cmd, '-c', server.IP(), '-t', runtime, '-i', time_interval, '-4'] # '-J' iperf: '-y', 'C',
-            file_name = '{}/{}-{}_iperf.csv'.format(folder, self.rep_num, client)
+            client_cmd = ['iperf3', '-c', server.IP(), '-t', runtime, '-i', time_interval, '-4'] # '-J' iperf: '-y', 'C',
+            file_name = '{}/{}-{}_iperf.csv'.format(self.out_folder, self.rep_num, client)
             client_cmd += ['&>', file_name, ';', 'echo', '$?']
 
             client_cmd = map(str, client_cmd)
@@ -148,7 +162,7 @@ class MPMininet:
             if o[-3:-2] not in ['0']:
                 error('client popen did not exit correctly\n')
                 raise RuntimeError('Client iperf did not exit correctly, error code {}\n'.format(o[-3:-2]),
-                                   folder, self.rep_num)
+                                   self.out_folder, self.rep_num)
 
             # interrupt tcpdump
             client.cmd('pkill -SIGINT tcpdump')
@@ -159,6 +173,32 @@ class MPMininet:
         output('\t\tDone with experiment, cleanup\n')
         system_call('pkill iperf3', ignore_codes=[1])
         system_call('pkill tcpdump', ignore_codes=[1])
+
+    def calculate_rtt(self, del_pcap):
+        """
+        Use tshark to extract RTT times from the pcap file generated by tcpdump.
+
+        :param del_pcap: delete tcpdump file after calculations
+        :return: None
+        """
+        if not self.use_tcpdump:
+            info('No dumps to analyze continue.\n')
+            return
+
+        for client, _ in self.get_iperf_pairings():
+            pcap_file = '{}/{}-{}_iperf_dump.pcap'.format(self.out_folder, self.rep_num, client)
+            out_file = '{}/{}-{}_iperf_dump.csv'.format(self.out_folder, self.rep_num, client)
+            parse_cmd = ['tshark', '-r', pcap_file]
+            parse_cmd += ['-e', 'frame.time_relative', '-e', 'tcp.stream', '-e', 'ip.src', '-e', 'ip.dst',
+                          '-e', 'tcp.analysis.ack_rtt', '-e', 'tcp.options.mptcp.datalvllen', '-T', 'fields',
+                          '-E', 'header=y']
+            with open(out_file, 'w+') as f:
+                p = subprocess.Popen(parse_cmd, stdout=f, stderr=subprocess.PIPE)
+                _, err = p.communicate()
+                p.terminate()
+
+            if del_pcap:
+                os.remove(pcap_file)
 
     def run(self, runtime=30):
         iperf_pairs = self.get_iperf_pairings()
