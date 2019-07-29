@@ -56,19 +56,19 @@ class SingleMPFlowTopo(MPTopo):
         # Add links
         if bw_restriction_on_first_leg:
             print('Adding bw restriction to first leg')
-            self.addLink(h1, s1, bw=10)  # , delay='0ms', jitter='0.25ms')
-            self.addLink(h1, s3, bw=10)  # , delay='0ms', jitter='0.25ms')
+            self.addLink(h1, s1, bw=10, delay='0.1ms')  # , delay='0ms', jitter='0.25ms')
+            self.addLink(h1, s3, bw=10, delay='0.1ms')  # , delay='0ms', jitter='0.25ms')
 
         else:
             print('NOT adding bw restriction to first leg')
-            self.addLink(h1, s1)  # , delay='0ms', jitter='0.25ms')
-            self.addLink(h1, s3)  # , delay='0ms', jitter='0.25ms')
+            self.addLink(h1, s1, delay='0.1ms')  # , delay='0ms', jitter='0.25ms')
+            self.addLink(h1, s3, delay='0.1ms')  # , delay='0ms', jitter='0.25ms')
 
         self.addLink(s1, s2, bw=10, delay='50ms')
         self.addLink(s3, s4, bw=10, delay='50ms')
 
-        self.addLink(s2, h2)
-        self.addLink(s4, h2)
+        self.addLink(s2, h2, delay='0.1ms')
+        self.addLink(s4, h2, delay='0.1ms')
 
 
 def main():
@@ -90,7 +90,7 @@ def main():
         time.sleep(1)
 
         # Test throughput for different configurations
-        for cc in ['lia', 'olia', 'balia', 'wvegas']:
+        for cc in ['lia', 'olia', 'balia', 'wvegas', 'cubic']:
             print('\n#### Testing bandwidth for {} (restriction on first leg: {})####'.format(cc, bw_on_first_leg))
 
             # set congestion control algoritm

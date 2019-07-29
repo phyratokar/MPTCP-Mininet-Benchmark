@@ -5,7 +5,7 @@
   "revision": "",
   "metric": null,
   "router_id": "10.0.0.0",
-  "topology_id": "mp-vs-sp",
+  "topology_id": "mp_vs_sp",
   "label": "Compare MPTCP against SPTCP",
   "nodes": [
     {

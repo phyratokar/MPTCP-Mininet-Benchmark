@@ -173,8 +173,11 @@ class MPMininet:
 
             # interrupt tcpdump
             client.cmd('pkill -SIGINT tcpdump')
+
+        # Send interrupt to iperf3 servers and wait for completion, without waiting mininet will fail on assertion
         for _, server in iperf_pairs:
             server.sendInt()
+            _ = server.monitor(timeoutms=100)
 
         time.sleep(1)
         output('\t\tDone with experiment, cleanup\n')

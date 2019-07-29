@@ -1,0 +1,205 @@
+{
+  "type": "NetworkGraph",
+  "protocol": "static",
+  "version": "1.0.0",
+  "revision": "",
+  "metric": null,
+  "router_id": "10.0.0.0",
+  "topology_id": "asym_mp",
+  "label": "Simple MPTCP capable host pair",
+  "nodes": [
+    {
+      "id": "h1",
+      "local_addresses": [
+        "10.0.0.1",
+        "10.0.1.1"
+      ],
+      "properties": {
+        "server": "h2"
+      }
+    },
+    {
+      "id": "h2",
+      "local_addresses": [
+        "10.0.0.2",
+        "10.0.1.2"
+      ],
+      "properties": {
+      }
+    },
+    {
+      "id": "h3",
+      "local_addresses": [
+        "10.0.0.3",
+        "10.0.1.3"
+      ],
+      "properties": {
+        "server": "h4"
+      }
+    },
+    {
+      "id": "h4",
+      "local_addresses": [
+        "10.0.0.4",
+        "10.0.1.4"
+      ],
+      "properties": {
+      }
+    },
+    {
+      "id": "h5",
+      "local_addresses": [
+        "10.0.0.5",
+        "10.0.1.5"
+      ],
+      "properties": {
+        "server": "h6"
+      }
+    },
+    {
+      "id": "h6",
+      "local_addresses": [
+        "10.0.0.6",
+        "10.0.1.6"
+      ],
+      "properties": {
+      }
+    },
+    {
+      "id": "s1"
+    },
+    {
+      "id": "s2"
+    },
+    {
+      "id": "s3"
+    },
+    {
+      "id": "s4"
+    }
+  ],
+  "links": [
+    {
+      "source": "h1",
+      "target": "s1",
+      "cost": 1.000,
+      "properties": {
+        "latency": 0,
+        "latency_text": "ms",
+        "throughput": 10,
+        "bandwidth_group": "a",
+        "throughput_text": "Mbps"
+      }
+    },
+    {
+      "source": "h3",
+      "target": "s1",
+      "cost": 1.000,
+      "properties": {
+        "latency": 0,
+        "latency_text": "ms",
+        "throughput": 10,
+        "bandwidth_group": "a",
+        "throughput_text": "Mbps"
+      }
+    },
+    {
+      "source": "h3",
+      "target": "s3",
+      "cost": 1.000,
+      "properties": {
+        "latency": 0,
+        "latency_text": "ms",
+        "throughput": 10,
+        "bandwidth_group": "b",
+        "throughput_text": "Mbps"
+      }
+    },
+    {
+      "source": "h5",
+      "target": "s3",
+      "cost": 1.000,
+      "properties": {
+        "latency": 0,
+        "latency_text": "ms",
+        "throughput": 10,
+        "bandwidth_group": "b",
+        "throughput_text": "Mbps"
+      }
+    },
+    {
+      "source": "s1",
+      "target": "s2",
+      "cost": 1.000,
+      "properties": {
+        "latency": 10.0,
+        "latency_group": "a",
+        "latency_text": "ms",
+        "throughput": 6,
+        "bandwidth_group": "a",
+        "throughput_text": "Mbps"
+      }
+    },
+    {
+      "source": "s3",
+      "target": "s4",
+      "cost": 1.000,
+      "properties": {
+        "latency": 10.0,
+        "latency_group": "b",
+        "latency_text": "ms",
+        "throughput": 9,
+        "bandwidth_group": "b",
+        "throughput_text": "Mbps"
+      }
+    },
+    {
+      "source": "s2",
+      "target": "h2",
+      "cost": 1.000,
+      "properties": {
+        "latency": 0,
+        "latency_text": "ms",
+        "throughput": 10,
+        "bandwidth_group": "a",
+        "throughput_text": "Mbps"
+      }
+    },
+    {
+      "source": "s2",
+      "target": "h4",
+      "cost": 1.000,
+      "properties": {
+        "latency": 0,
+        "latency_text": "ms",
+        "throughput": 10,
+        "bandwidth_group": "a",
+        "throughput_text": "Mbps"
+      }
+    },
+    {
+      "source": "s4",
+      "target": "h4",
+      "cost": 1.000,
+      "properties": {
+        "latency": 0,
+        "latency_text": "ms",
+        "throughput": 10,
+        "bandwidth_group": "b",
+        "throughput_text": "Mbps"
+      }
+    },
+    {
+      "source": "s4",
+      "target": "h6",
+      "cost": 1.000,
+      "properties": {
+        "latency": 0,
+        "latency_text": "ms",
+        "throughput": 10,
+        "bandwidth_group": "b",
+        "throughput_text": "Mbps"
+      }
+    }
+  ]
+}

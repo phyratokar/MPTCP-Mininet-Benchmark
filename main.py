@@ -290,7 +290,7 @@ if __name__ == '__main__':
 
     parser.add_argument('--topo',
                         help="Topology to use",
-                        choices=['shared_link', 'two_paths', 'mp-vs-sp', 'single_path'],
+                        choices=['shared_link', 'two_paths', 'mp_vs_sp', 'single_path', 'single_bottleneck'],
                         required=True,
                         default='two_paths')
 

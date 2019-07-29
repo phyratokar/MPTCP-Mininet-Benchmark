@@ -15,6 +15,7 @@ data['type'] = 'NetworkCollection'
 
 network_list = []
 for fn in files:
+    print('reading file {}'.format(fn))
     with open(fn, 'r') as f:
         c = json.loads(f.read())
         c['type'] = c['topology_id']

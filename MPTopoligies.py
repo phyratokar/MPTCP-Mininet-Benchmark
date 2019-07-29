@@ -1,4 +1,4 @@
-from mininet.log import info, error
+from mininet.log import info, warn, error
 from mininet.topo import Topo
 
 
@@ -39,6 +39,8 @@ class JsonTopo(MPTopo):
     """
     JSON definition of Topology.
     """
+    zero_warning_given = False
+
     def build(self, config):
         nodes = {}
 
@@ -62,7 +64,14 @@ class JsonTopo(MPTopo):
                 exit(1)
 
             hs, hd = nodes.get(src), nodes.get(dst)
-            linkopts = dict(bw=throughput, delay='{}ms'.format(latency), jitter=self.JITTER)
+
+            if latency == 0 and not self.zero_warning_given:
+                self.zero_warning_given = True
+                warn('Attention, working with "0ms" delay in topologies where there are links with some delay can '
+                      'yield unexpected results! As a precaution "0ms" is changed to "0.1ms"\n')
+
+            linkopts = dict(bw=throughput, delay='{}ms'.format(latency if latency > 1 else 0.1),
+                            jitter='0ms', max_queue_size=1000, loss=0)
             self.addLink(hs, hd, **linkopts)
             info('Link added {}-{}, options {}\n'.format(hs, hd, linkopts))
 
