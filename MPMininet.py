@@ -70,6 +70,13 @@ class MPMininet:
 
     @staticmethod
     def _set_system_variable(var, value):
+        """
+        Use Mininet command execution to set and verify sysctl variables.
+
+        :param var:     sysctl var name, e.g. 'net.mptcp.mptcp_enabled'
+        :param value:   variable value, e.g. '1'
+        :return:
+        """
         errFail(['sysctl', '-w', '{0}={1}'.format(var, value)])
         out, err, ret = errFail(['sysctl', '-n', var])
         info('type {} and value "{}"'.format(type(out), out))
@@ -195,7 +202,6 @@ class MPMininet:
             with open(out_file, 'w+') as f:
                 p = subprocess.Popen(parse_cmd, stdout=f, stderr=subprocess.PIPE)
                 _, err = p.communicate()
-                p.terminate()
 
             if del_pcap:
                 os.remove(pcap_file)

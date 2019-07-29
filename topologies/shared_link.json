@@ -62,7 +62,7 @@
         "latency": 0,
         "latency_text": "ms",
         "throughput": 10,
-        "throughput_group": "a",
+        "bandwidth_group": "a",
         "throughput_text": "Mbps"
       }
     },
@@ -74,7 +74,7 @@
         "latency": 0,
         "latency_text": "ms",
         "throughput": 10,
-        "throughput_group": "a",
+        "bandwidth_group": "a",
         "throughput_text": "Mbps"
       }
     },
@@ -87,7 +87,7 @@
         "latency_group": "a",
         "latency_text": "ms",
         "throughput": 10,
-        "throughput_group": "a",
+        "bandwidth_group": "a",
         "throughput_text": "Mbps"
       }
     },
@@ -99,7 +99,7 @@
         "latency": 0,
         "latency_text": "ms",
         "throughput": 10,
-        "throughput_group": "a",
+        "bandwidth_group": "a",
         "throughput_text": "Mbps"
       }
     },
@@ -111,7 +111,7 @@
         "latency": 0,
         "latency_text": "ms",
         "throughput": 10,
-        "throughput_group": "a",
+        "bandwidth_group": "a",
         "throughput_text": "Mbps"
       }
     }
