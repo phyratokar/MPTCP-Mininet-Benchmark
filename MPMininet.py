@@ -108,13 +108,13 @@ class MPMininet:
         mininet_host_pairs = map(lambda x: (self.net.get(x[0]), self.net.get(x[1])), pairs)
         return mininet_host_pairs
 
-    def run_iperf(self, runtime=15, skipping=False, time_interval=1):
+    def run_iperf(self, runtime=15, skipping=False, time_interval=0.1):
         """
         Starting iperf on appropriate hosts using the cmp interface provided by minient.
 
         Note: Mininet also exposes a popen mechanism for executing commands on any node. I encountered issues when using
-            it. Somehow the many popen commands lead to iperf3 having a bufferoverflow exception and too many file
-            handles beeing open after many build up and tear downs of mininet.
+            it. Somehow the many popen commands lead to iperf3 having a bufferoverflow exception.
+            https://github.com/esnet/iperf/issues/448
 
         :param runtime:     how long [seconds] to run iperf
         :param skipping:    should already executed experiments be skipped

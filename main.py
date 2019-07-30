@@ -24,6 +24,10 @@ def check_system():
     """
     Ensure MPTCP kernel and correct version of Mininet are installed on system. Mininet mismatch prints warning while
     missing MPTCP functionalities or Mininet installation will raise exceptions.
+
+    Note:   Using mininet verison 2.2.2 or older leads to issues when many experiments are run (many build ups and
+            tear downs of miniet) because mininet nodes do not correctly close their Pseduo-TTY pipes.
+                => https://github.com/mininet/mininet/issues/838
     """
     out = subprocess.check_output('mn --version', shell=True, stderr=subprocess.STDOUT)
     if not out.startswith('2.3.'):
@@ -134,6 +138,8 @@ def run_sym_configs(topo_name, group_name, group_values):
     # Read in config file containing the topology
     orig_config = read_json(Topologies_file.format(topo_name))
     groups, n_changeable_links = extract_groups(orig_config, group_field=group_name)
+    bw_groups, _ = extract_groups(orig_config, group_field='bandwidth_group')
+    de_groups, _ = extract_groups(orig_config, group_field='latency_group')
 
     # generate all configurations to run for the current group, i.e. for 2 groups a list with tuples [(v_a, v_b)]
     mgroups = tuple([group_values] * len(groups))
@@ -156,10 +162,11 @@ def run_sym_configs(topo_name, group_name, group_values):
                 # pprint.pprint(config)
                 # Run experiments
                 if group_name is 'latency_group':
+                    # TODO use actually configured bw/dealy in naming!
                     delay_dir = '-'.join(['{}ms'.format(delay) for delay in cur_values])
-                    tp_dir = '{}Mbps-{}Mbps'.format(10, 10)
+                    tp_dir = '-'.join(['{}Mbps'.format(10) for _ in bw_groups])  # '{}Mbps-{}Mbps'.format(10, 10)
                 else:
-                    delay_dir = '{}ms-{}ms'.format(0, 0)
+                    delay_dir = '-'.join(['{}ms'.format(10) for _ in de_groups])  # '{}ms-{}ms'.format(0, 0)
                     tp_dir = '-'.join(['{}Mbps'.format(bw) for bw in cur_values])
 
                 # Run experiment and shut it down immediately afterwards
@@ -216,14 +223,18 @@ def main():
     # run_tp_fairness('mp-vs-sp')
     # run_tp_fairness_single('single_path')
     if args.run:
+        latencies = np.arange(0, 102, 20)
+        bandwidths = [5, 9, 13, 15, 17, 21, 25]
+
         if args.run == 'de':
             # run_latency(args.topo)
-            latencies = np.arange(0, 102, 30)
-            # latencies[0] = 1  # avoid latency 0ms in any topology
             run_sym_configs(args.topo, group_name='latency_group', group_values=latencies)
         elif args.run == 'tp':
             # run_tp_fairness(args.topo)
-            run_sym_configs(args.topo, group_name='bandwidth_group', group_values=[5, 9, 13, 15, 17, 21, 25])
+            run_sym_configs(args.topo, group_name='bandwidth_group', group_values=bandwidths)
+        elif args.run == 'all':
+            run_sym_configs(args.topo, group_name='latency_group', group_values=latencies)
+            run_sym_configs(args.topo, group_name='bandwidth_group', group_values=bandwidths)
     else:
         config = read_json('topologies/' + args.topo + '.json')
         topo = JsonTopo(config)
@@ -255,8 +266,8 @@ if __name__ == '__main__':
                         help="Instead of running experiments, open CLI")
 
     parser.add_argument('--run',
-                        choices=['de', 'tp'],
-                        help="Which tsks to run")
+                        choices=['de', 'tp', 'all'],
+                        help="Which tasks to run")
 
     parser.add_argument('--log',
                         choices=['info', 'debug', 'output', 'warning', 'error', 'critical'],
