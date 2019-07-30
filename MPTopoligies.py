@@ -46,13 +46,13 @@ class JsonTopo(MPTopo):
 
         for node in config['nodes']:
             if node['id'].startswith('h'):
-                info('Host {} added'.format(node['id']))
+                info('Host {} added\n'.format(node['id']))
                 nodes[node['id']] = self.addHost(str(node['id']))
             elif node['id'].startswith('s'):
-                info('Switch {} added'.format(node['id']))
+                info('Switch {} added\n'.format(node['id']))
                 nodes[node['id']] = self.addSwitch(str(node['id']))
             else:
-                error('Unknown node type encountered!')
+                error('Unknown node type encountered!\n')
                 exit(1)
 
         for link in config['links']:
@@ -60,7 +60,7 @@ class JsonTopo(MPTopo):
             latency, throughput = link['properties']['latency'], link['properties']['throughput']
 
             if src not in nodes or dst not in nodes:
-                error('Link src or destination does not exist!\t{}<->{}'.format(src, dst))
+                error('Link src or destination does not exist!\t{}<->{}\n'.format(src, dst))
                 exit(1)
 
             hs, hd = nodes.get(src), nodes.get(dst)
@@ -70,8 +70,9 @@ class JsonTopo(MPTopo):
                 warn('Attention, working with "0ms" delay in topologies where there are links with some delay can '
                       'yield unexpected results! As a precaution "0ms" is changed to "0.1ms"\n')
 
+            # TODO add loss to configuration if needed/specified
             linkopts = dict(bw=throughput, delay='{}ms'.format(latency if latency > 1 else 0.1),
-                            jitter='0ms', max_queue_size=1000, loss=0)
+                            jitter='0ms', max_queue_size=1000)  # loss=0
             self.addLink(hs, hd, **linkopts)
             info('Link added {}-{}, options {}\n'.format(hs, hd, linkopts))
 

@@ -7,7 +7,7 @@ import subprocess
 
 from MPTopoligies import JsonTopo
 from mininet.cli import CLI
-from mininet.log import error, info, output
+from mininet.log import error, info, debug, output
 from mininet.net import Mininet
 from mininet.util import errFail
 from mininet.link import TCLink
@@ -80,7 +80,7 @@ class MPMininet:
         """
         errFail(['sysctl', '-w', '{0}={1}'.format(var, value)])
         out, err, ret = errFail(['sysctl', '-n', var])
-        info('type {} and value "{}"'.format(type(out), out))
+        debug('type {} and value "{}"\n'.format(type(out), out.strip()))
         out = out.replace('\n', '')
         if type(value) is bool and bool(out) != value or type(value) is not bool and out != str(value):
             raise Exception("sysctl Fail: setting {} failed, should be {} is {}".format(var, value, out))
