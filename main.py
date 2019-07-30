@@ -233,8 +233,8 @@ def main():
             # run_tp_fairness(args.topo)
             run_sym_configs(args.topo, group_name='bandwidth_group', group_values=bandwidths)
         elif args.run == 'all':
-            run_sym_configs(args.topo, group_name='latency_group', group_values=latencies)
             run_sym_configs(args.topo, group_name='bandwidth_group', group_values=bandwidths)
+            run_sym_configs(args.topo, group_name='latency_group', group_values=latencies)
     else:
         config = read_json('topologies/' + args.topo + '.json')
         topo = JsonTopo(config)
@@ -258,7 +258,7 @@ if __name__ == '__main__':
                         help="Store captured tcpdumps per connections")
 
     parser.add_argument('--no_dtcp',
-                        action='store_false',
+                        action='store_true',
                         help="Do NOT use tcpdump (no RTT analysis possible)")
 
     parser.add_argument('--cli',
@@ -272,11 +272,6 @@ if __name__ == '__main__':
     parser.add_argument('--log',
                         choices=['info', 'debug', 'output', 'warning', 'error', 'critical'],
                         help="Mininet logging level")
-
-    parser.add_argument('--cc',
-                        help="Congestion Control Algorithm used (lia, olia, balia, wVegas)",
-                        choices=Congestion_control_algorithms,
-                        default=Congestion_control_algorithms[1])
 
     parser.add_argument('--topo',
                         help="Topology to use",
