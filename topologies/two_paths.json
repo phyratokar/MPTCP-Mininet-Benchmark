@@ -46,7 +46,7 @@
       "target": "s1",
       "cost": 1.000,
       "properties": {
-        "latency": 0,
+        "latency": 0.1,
         "latency_text": "ms",
         "throughput": 10,
         "bandwidth_group": "a",
@@ -58,7 +58,7 @@
       "target": "s3",
       "cost": 1.000,
       "properties": {
-        "latency": 0,
+        "latency": 0.1,
         "latency_text": "ms",
         "throughput": 10,
         "bandwidth_group": "b",
@@ -96,7 +96,7 @@
       "target": "h2",
       "cost": 1.000,
       "properties": {
-        "latency": 0,
+        "latency": 0.1,
         "latency_text": "ms",
         "throughput": 10,
         "bandwidth_group": "a",
@@ -108,7 +108,7 @@
       "target": "h2",
       "cost": 1.000,
       "properties": {
-        "latency": 0,
+        "latency": 0.1,
         "latency_text": "ms",
         "throughput": 10,
         "bandwidth_group": "b",

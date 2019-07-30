@@ -83,7 +83,7 @@
       "target": "s1",
       "cost": 1.000,
       "properties": {
-        "latency": 0,
+        "latency": 0.1,
         "latency_text": "ms",
         "throughput": 10,
         "bandwidth_group": "a",
@@ -95,7 +95,7 @@
       "target": "s3",
       "cost": 1.000,
       "properties": {
-        "latency": 0,
+        "latency": 0.1,
         "latency_text": "ms",
         "throughput": 10,
         "bandwidth_group": "a",
@@ -107,7 +107,7 @@
       "target": "s5",
       "cost": 1.000,
       "properties": {
-        "latency": 0,
+        "latency": 0.1,
         "latency_text": "ms",
         "throughput": 10,
         "bandwidth_group": "a",
@@ -119,7 +119,7 @@
       "target": "s7",
       "cost": 1.000,
       "properties": {
-        "latency": 0,
+        "latency": 0.1,
         "latency_text": "ms",
         "throughput": 10,
         "bandwidth_group": "b",
@@ -131,7 +131,7 @@
       "target": "s9",
       "cost": 1.000,
       "properties": {
-        "latency": 0,
+        "latency": 0.1,
         "latency_text": "ms",
         "throughput": 10,
         "bandwidth_group": "a",
@@ -143,7 +143,7 @@
       "target": "s9",
       "cost": 1.000,
       "properties": {
-        "latency": 0,
+        "latency": 0.1,
         "latency_text": "ms",
         "throughput": 10,
         "bandwidth_group": "a",
@@ -155,7 +155,7 @@
       "target": "s9",
       "cost": 1.000,
       "properties": {
-        "latency": 0,
+        "latency": 0.1,
         "latency_text": "ms",
         "throughput": 10,
         "bandwidth_group": "a",
@@ -167,7 +167,7 @@
       "target": "s9",
       "cost": 1.000,
       "properties": {
-        "latency": 0,
+        "latency": 0.1,
         "latency_text": "ms",
         "throughput": 10,
         "bandwidth_group": "b",
@@ -192,7 +192,7 @@
       "target": "s2",
       "cost": 1.000,
       "properties": {
-        "latency": 0,
+        "latency": 0.1,
         "latency_text": "ms",
         "throughput": 10,
         "bandwidth_group": "a",
@@ -204,7 +204,7 @@
       "target": "s4",
       "cost": 1.000,
       "properties": {
-        "latency": 0,
+        "latency": 0.1,
         "latency_text": "ms",
         "throughput": 10,
         "bandwidth_group": "a",
@@ -216,7 +216,7 @@
       "target": "s6",
       "cost": 1.000,
       "properties": {
-        "latency": 0,
+        "latency": 0.1,
         "latency_text": "ms",
         "throughput": 10,
         "bandwidth_group": "a",
@@ -228,7 +228,7 @@
       "target": "s8",
       "cost": 1.000,
       "properties": {
-        "latency": 0,
+        "latency": 0.1,
         "latency_text": "ms",
         "throughput": 10,
         "bandwidth_group": "b",
@@ -240,7 +240,7 @@
       "target": "h2",
       "cost": 1.000,
       "properties": {
-        "latency": 0,
+        "latency": 0.1,
         "latency_text": "ms",
         "throughput": 10,
         "bandwidth_group": "a",
@@ -252,7 +252,7 @@
       "target": "h2",
       "cost": 1.000,
       "properties": {
-        "latency": 0,
+        "latency": 0.1,
         "latency_text": "ms",
         "throughput": 10,
         "bandwidth_group": "a",
@@ -264,7 +264,7 @@
       "target": "h2",
       "cost": 1.000,
       "properties": {
-        "latency": 0,
+        "latency": 0.1,
         "latency_text": "ms",
         "throughput": 10,
         "bandwidth_group": "a",
@@ -276,7 +276,7 @@
       "target": "h4",
       "cost": 1.000,
       "properties": {
-        "latency": 0,
+        "latency": 0.1,
         "latency_text": "ms",
         "throughput": 10,
         "bandwidth_group": "b",

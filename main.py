@@ -11,7 +11,7 @@ import numpy as np
 from mininet.cli import CLI
 from mininet.net import Mininet
 from mininet.link import TCLink
-from mininet.log import setLogLevel
+from mininet.log import setLogLevel, info, error, debug
 
 from MPMininet import MPMininet
 from MPTopoligies import JsonTopo
@@ -149,7 +149,7 @@ def run_sym_configs(topo_name, group_name, group_values):
 
                 changed = 0
                 for group, val in zip(groups, cur_values):
-                    print('Changing group {} to value {}'.format(group, val))
+                    info('Changing group {} to value {}\n'.format(group, val))
                     changed += adjust_group_config(config, group_name, group, val)
 
                 if changed != n_changeable_links: # TODO move this check out of the experiment loop, should be enought to run once!
