@@ -57,7 +57,7 @@ class JsonTopo(MPTopo):
 
         for link in config['links']:
             src, dst = link['source'], link['target']
-            latency, throughput = link['properties']['latency'], link['properties']['throughput']
+            latency, bandwidth = link['properties']['latency'], link['properties']['bandwidth']
 
             if src not in nodes or dst not in nodes:
                 error('Link src or destination does not exist!\t{}<->{}\n'.format(src, dst))
@@ -71,7 +71,7 @@ class JsonTopo(MPTopo):
                       'yield unexpected results! As a precaution "0ms" is changed to "0.1ms"\n'.format(latency))
 
             # TODO add loss to configuration if needed/specified
-            linkopts = dict(bw=throughput, delay='{}ms'.format(latency if latency > 1 else 0.1),
+            linkopts = dict(bw=bandwidth, delay='{}ms'.format(latency if latency > 1 else 0.1),
                             jitter='0ms', max_queue_size=1000)  # loss=0
             self.addLink(hs, hd, **linkopts)
             info('Link added {}-{}, options {}\n'.format(hs, hd, linkopts))

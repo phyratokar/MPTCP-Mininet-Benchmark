@@ -57,7 +57,7 @@ def extract_groups(config, group_field):
     :return:            touple (unique groups list, number of links in all groups)
     """
     if group_field not in ['latency_group', 'bandwidth_group']:
-        raise NotImplementedError('Only latency and throughput groups currently supported, "{}" not recognized.'.format(group_field))
+        raise NotImplementedError('Only latency and bandwidth groups currently supported, "{}" not recognized.'.format(group_field))
 
     groups = get_groups(config, group_field)
     unique_groups = np.unique(groups)
@@ -67,22 +67,22 @@ def extract_groups(config, group_field):
     return unique_groups, len(groups)
 
 
-def adjust_group_config(config, groupname, group, value):
+def adjust_group_config(config, group_name, group, value):
     """
     Change latency or bandwidth value of entire group in JSON config.
 
     :param config:      JSON/dict config to be changed (inplace!)
-    :param groupname:   'latency_group' / 'bandwidth_group'
+    :param group_name:  'latency_group' / 'bandwidth_group'
     :param group:       groupname, e.g. 'a' or 'b'
     :param value:       value to set, e.g. '10.0'
     :return:            number of link properties changed
     """
-
+    value_name = group_name.partition('_')[0]
     changes = 0
     for link in config['links']:
-        if groupname in link['properties']:
-            if link['properties'][groupname] == group:
-                link['properties']['latency'] = value
+        if group_name in link['properties']:
+            if link['properties'][group_name] == group:
+                link['properties'][value_name] = value
                 changes += 1
     return changes
 
@@ -118,8 +118,8 @@ def run_latency(topo_name):
                     # Run experiments
                     delay_dir = '{}ms-{}ms'.format(delay_a, delay_b)
                     tp_dir = '{}Mbps-{}Mbps'.format(10, 10)
-                    MPMininet(config, cc_name, use_tcpdump=args.dtcp, delay_name=delay_dir,
-                              throughput_name=tp_dir, repetition_number=rep)
+                    MPMininet(config, cc_name, delay_name=delay_dir,
+                              bandwidth_name=tp_dir, repetition_number=rep)
                     # return
 
 
@@ -153,7 +153,7 @@ def run_sym_configs(topo_name, group_name, group_values):
                 if changed != n_changeable_links:  # TODO move this check out of the experiment loop, should be enought to run once!
                     raise RuntimeError('There are more links with the "{}" property than just changed in the config!'.format(group_name))
 
-                # pprint.pprint(cur_config)
+                # pprint.pprint(config)
                 # Run experiments
                 if group_name is 'latency_group':
                     delay_dir = '-'.join(['{}ms'.format(delay) for delay in cur_values])
@@ -163,8 +163,8 @@ def run_sym_configs(topo_name, group_name, group_values):
                     tp_dir = '-'.join(['{}Mbps'.format(bw) for bw in cur_values])
 
                 # Run experiment and shut it down immediately afterwards
-                MPMininet(config, cc_name, use_tcpdump=args.dtcp, delay_name=delay_dir,
-                          throughput_name=tp_dir, repetition_number=rep)
+                MPMininet(config, cc_name, delay_name=delay_dir, bandwidth_name=tp_dir, repetition_number=rep,
+                          start_cli=args.cli, use_tcpdump=(not args.no_dtcp), keep_tcpdumps=args.dtcp)
                 # return
 
 
@@ -187,13 +187,13 @@ def run_tp_fairness(topo_name):
                 for tp_b in tps_b:
                     config = copy.deepcopy(orig_config)
 
-                    # Set link throughputs
+                    # Set link bandwidths
                     for link in config['links']:
                         if 'bandwidth_group' in link['properties']:
                             if link['properties']['bandwidth_group'] == 'a':
-                                link['properties']['throughput'] = tp_a
+                                link['properties']['bandwidth'] = tp_a
                             elif link['properties']['bandwidth_group'] == 'b':
-                                link['properties']['throughput'] = tp_b
+                                link['properties']['bandwidth'] = tp_b
                             else:
                                 raise NotImplementedError('Not yet implemented more than two bandwidth_groups for links. {}'.format(link))
                         else:
@@ -204,7 +204,7 @@ def run_tp_fairness(topo_name):
                     tp_dir = '{}Mbps-{}Mbps'.format(tp_a, tp_b)
 
                     # Run experiments
-                    MPMininet(config, cc_name, delay_name=delay_dir, use_tcpdump=args.dtcp, throughput_name=tp_dir, repetition_number=rep)
+                    MPMininet(config, cc_name, delay_name=delay_dir, bandwidth_name=tp_dir, repetition_number=rep)
                     # return
 
 
@@ -244,7 +244,15 @@ if __name__ == '__main__':
 
     parser.add_argument('--dtcp', '-d',
                         action='store_true',
-                        help="Capture connections with tcpdump")
+                        help="Store captured tcpdumps per connections")
+
+    parser.add_argument('--no_dtcp',
+                        action='store_false',
+                        help="Do NOT use tcpdump (no RTT analysis possible)")
+
+    parser.add_argument('--cli',
+                        action='store_true',
+                        help="Instead of running experiments, open CLI")
 
     parser.add_argument('--run',
                         choices=['de', 'tp'],

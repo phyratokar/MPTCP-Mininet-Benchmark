@@ -86,9 +86,9 @@
       "properties": {
         "latency": 0.1,
         "latency_text": "ms",
-        "throughput": 10,
+        "bandwidth": 10,
         "bandwidth_group": "a",
-        "throughput_text": "Mbps"
+        "bandwidth_text": "Mbps"
       }
     },
     {
@@ -98,9 +98,9 @@
       "properties": {
         "latency": 0.1,
         "latency_text": "ms",
-        "throughput": 10,
+        "bandwidth": 10,
         "bandwidth_group": "a",
-        "throughput_text": "Mbps"
+        "bandwidth_text": "Mbps"
       }
     },
     {
@@ -110,9 +110,9 @@
       "properties": {
         "latency": 0.1,
         "latency_text": "ms",
-        "throughput": 10,
+        "bandwidth": 10,
         "bandwidth_group": "b",
-        "throughput_text": "Mbps"
+        "bandwidth_text": "Mbps"
       }
     },
     {
@@ -122,9 +122,9 @@
       "properties": {
         "latency": 0.1,
         "latency_text": "ms",
-        "throughput": 10,
+        "bandwidth": 10,
         "bandwidth_group": "b",
-        "throughput_text": "Mbps"
+        "bandwidth_text": "Mbps"
       }
     },
     {
@@ -135,9 +135,9 @@
         "latency": 10.0,
         "latency_group": "a",
         "latency_text": "ms",
-        "throughput": 6,
+        "bandwidth": 6,
         "bandwidth_group": "a",
-        "throughput_text": "Mbps"
+        "bandwidth_text": "Mbps"
       }
     },
     {
@@ -148,9 +148,9 @@
         "latency": 10.0,
         "latency_group": "b",
         "latency_text": "ms",
-        "throughput": 9,
+        "bandwidth": 9,
         "bandwidth_group": "b",
-        "throughput_text": "Mbps"
+        "bandwidth_text": "Mbps"
       }
     },
     {
@@ -160,9 +160,9 @@
       "properties": {
         "latency": 0.1,
         "latency_text": "ms",
-        "throughput": 10,
+        "bandwidth": 10,
         "bandwidth_group": "a",
-        "throughput_text": "Mbps"
+        "bandwidth_text": "Mbps"
       }
     },
     {
@@ -172,9 +172,9 @@
       "properties": {
         "latency": 0.1,
         "latency_text": "ms",
-        "throughput": 10,
+        "bandwidth": 10,
         "bandwidth_group": "a",
-        "throughput_text": "Mbps"
+        "bandwidth_text": "Mbps"
       }
     },
     {
@@ -184,9 +184,9 @@
       "properties": {
         "latency": 0.1,
         "latency_text": "ms",
-        "throughput": 10,
+        "bandwidth": 10,
         "bandwidth_group": "b",
-        "throughput_text": "Mbps"
+        "bandwidth_text": "Mbps"
       }
     },
     {
@@ -196,9 +196,9 @@
       "properties": {
         "latency": 0.1,
         "latency_text": "ms",
-        "throughput": 10,
+        "bandwidth": 10,
         "bandwidth_group": "b",
-        "throughput_text": "Mbps"
+        "bandwidth_text": "Mbps"
       }
     }
   ]
