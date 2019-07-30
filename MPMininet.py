@@ -34,7 +34,7 @@ def system_call(cmd, ignore_codes=None):
 
 class MPMininet:
     """Create and run multiple paths network"""
-    def __init__(self, json_config, congestion_control, delay_name, throughput_name, repetition_number=0,
+    def __init__(self, json_config, congestion_control, delay_name, throughput_name, repetition_number,
                  start_cli=False, use_tcpdump=False):
         self.config = json_config
         self.use_tcpdump = use_tcpdump

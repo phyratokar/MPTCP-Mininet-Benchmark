@@ -137,9 +137,7 @@ def run_sym_configs(topo_name, group_name, group_values):
 
     # generate all configurations to run for the current group, i.e. for 2 groups a list with tuples [(v_a, v_b)]
     mgroups = tuple([group_values] * len(groups))
-    values_product = itertools.product(*mgroups)
-
-    # assert(len(groups) <= 2)  # making sure we only deal with 2 or less groups!
+    values_product = list(itertools.product(*mgroups))
 
     for rep in range(3):
         for cc_name in Congestion_control_algorithms:
@@ -152,7 +150,7 @@ def run_sym_configs(topo_name, group_name, group_values):
                     info('Changing group {} to value {}\n'.format(group, val))
                     changed += adjust_group_config(config, group_name, group, val)
 
-                if changed != n_changeable_links: # TODO move this check out of the experiment loop, should be enought to run once!
+                if changed != n_changeable_links:  # TODO move this check out of the experiment loop, should be enought to run once!
                     raise RuntimeError('There are more links with the "{}" property than just changed in the config!'.format(group_name))
 
                 # pprint.pprint(cur_config)
@@ -220,7 +218,9 @@ def main():
     if args.run:
         if args.run == 'de':
             # run_latency(args.topo)
-            run_sym_configs(args.topo, group_name='latency_group', group_values=np.arange(0, 102, 10))
+            latencies = np.arange(0, 102, 30)
+            # latencies[0] = 1  # avoid latency 0ms in any topology
+            run_sym_configs(args.topo, group_name='latency_group', group_values=latencies)
         elif args.run == 'tp':
             # run_tp_fairness(args.topo)
             run_sym_configs(args.topo, group_name='bandwidth_group', group_values=[5, 9, 13, 15, 17, 21, 25])
