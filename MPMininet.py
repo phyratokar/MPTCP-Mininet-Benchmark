@@ -48,7 +48,8 @@ class MPMininet:
         self.start(start_cli)
 
     def start(self, cli):
-        self.set_system_variables(mptcp=(self.congestion_control not in ['cubic']), cc=self.congestion_control)
+        # TODO replace mptcp check
+        self.set_system_variables(mptcp=(self.congestion_control in ['lia', 'olia', 'balia', 'wvegas']), cc=self.congestion_control)
 
         topo = JsonTopo(self.config)
 

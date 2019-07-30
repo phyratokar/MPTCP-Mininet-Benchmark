@@ -210,35 +210,6 @@ def run_tp_fairness(topo_name):
                     # return
 
 
-def run_tp_fairness_single(topo_name):
-    # Read in config file containing the topology
-    orig_config = read_json('topologies/{}.json'.format(topo_name))
-    tp_groups, num_changeable_links = extract_groups(orig_config, group_field='bandwidth_group')
-
-    # tps_a = [5, 7, 9, 11, 12, 13, 14, 15, 16, 17, 18, 19, 21, 23, 25]
-    tps_a = [5, 9, 13, 15, 17, 21, 25]
-
-    for rep in range(3):
-        for cc_name in Congestion_control_algorithms:
-            for tp_a in tps_a:
-                config = copy.deepcopy(orig_config)
-
-                # Set link throughputs
-                for link in config['links']:
-                    if 'bandwidth_group' in link['properties']:
-                        if link['properties']['bandwidth_group'] == 'a':
-                            link['properties']['throughput'] = tp_a
-                        else:
-                            raise NotImplementedError('Not yet implemented more than two bandwidth_groups for links. {}'.format(link))
-
-                delay_dir = '{}ms-{}ms'.format(10, 10)
-                tp_dir = '{}Mbps-{}Mbps'.format(tp_a, 0)
-
-                # Run experiments
-
-                MPMininet(config, cc_name, delay_name=delay_dir, use_tcpdump=args.dtcp, throughput_name=tp_dir, repetition_number=rep)
-
-
 def main():
     """Create and run multiple link network"""
     check_system()
@@ -251,8 +222,8 @@ def main():
             # run_latency(args.topo)
             run_sym_configs(args.topo, group_name='latency_group', group_values=np.arange(0, 102, 10))
         elif args.run == 'tp':
-            run_tp_fairness(args.topo)
-            # TODO distinguish between multi link and single link case
+            # run_tp_fairness(args.topo)
+            run_sym_configs(args.topo, group_name='bandwidth_group', group_values=[5, 9, 13, 15, 17, 21, 25])
     else:
         config = read_json('topologies/' + args.topo + '.json')
         topo = JsonTopo(config)
