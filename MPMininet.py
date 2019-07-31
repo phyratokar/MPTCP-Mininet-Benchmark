@@ -47,7 +47,13 @@ class MPMininet:
         self.out_folder = '{}/{}/{}/{}/{}'.format(self.base_folder, self.topology, self.congestion_control, self.tp_name, self.delay_name)
         self.start(start_cli)
 
-    def start(self, cli):
+    def start(self, cli, skipping=True):
+        # TODO handle skip case more elegantly
+        output('Running throughput experiment, exp {} repetition: {}\n'.format(self.out_folder, self.rep_num))
+        if skipping and os.path.isfile('{}/{}-{}_iperf.csv'.format(self.out_folder, self.rep_num, 'h2')):
+            output('already done.\n')
+            return
+
         # TODO replace mptcp check
         self.set_system_variables(mptcp=(self.congestion_control in ['lia', 'olia', 'balia', 'wvegas']), cc=self.congestion_control)
 
@@ -108,7 +114,7 @@ class MPMininet:
         mininet_host_pairs = map(lambda x: (self.net.get(x[0]), self.net.get(x[1])), pairs)
         return mininet_host_pairs
 
-    def run_iperf(self, runtime=15, skipping=False, time_interval=0.1):
+    def run_iperf(self, runtime=15, time_interval=0.1):
         """
         Starting iperf on appropriate hosts using the cmp interface provided by minient.
 
@@ -122,11 +128,6 @@ class MPMininet:
         :return: None
         """
         iperf_pairs = self.get_iperf_pairings()
-
-        output('Running iperf_cmd, exp {} repetition: {}\n'.format(self.out_folder, self.rep_num))
-        if skipping and os.path.isfile('{}/{}-{}_iperf.txt'.format(self.out_folder, self.rep_num, 'h2')):
-            print('already done.')
-            return
 
         if not os.path.exists(self.out_folder):
             os.makedirs(self.out_folder)
