@@ -123,7 +123,6 @@ class MPMininet:
             https://github.com/esnet/iperf/issues/448
 
         :param runtime:     how long [seconds] to run iperf
-        :param skipping:    should already executed experiments be skipped
         :param time_interval: time step between iperf output lines
         :return: None
         """
@@ -134,7 +133,7 @@ class MPMininet:
 
         # Start processes on client and server
         for _, server in iperf_pairs:
-            server_cmd = ['iperf3', '-s', '-4', '--one-off', '-i', time_interval] # iperf 3: '--one-off', '-J' iperf: '-y', 'C',
+            server_cmd = ['iperf3', '-s', '-4', '--one-off', '-f', 'm', '-i', time_interval] # iperf 3: '--one-off', '-J' iperf: '-y', 'C',
             file_name = '{}/{}-{}_iperf.csv'.format(self.out_folder, self.rep_num, server)
             server_cmd += ['&>', file_name]
 
@@ -155,7 +154,7 @@ class MPMininet:
                 info('Running on {}: \'{}\'\n'.format(client, ' '.join(dump_cmd)))
                 client.cmd(dump_cmd)
 
-            client_cmd = ['iperf3', '-c', server.IP(), '-t', runtime, '-i', time_interval, '-4'] # '-J' iperf: '-y', 'C',
+            client_cmd = ['iperf3', '-c', server.IP(), '-t', runtime, '-i', time_interval, '-f', 'm', '-4'] # '-J' iperf: '-y', 'C',
             file_name = '{}/{}-{}_iperf.csv'.format(self.out_folder, self.rep_num, client)
             client_cmd += ['&>', file_name, ';', 'echo', '$?']
 

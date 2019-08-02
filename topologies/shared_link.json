@@ -5,7 +5,7 @@
   "revision": "",
   "metric": null,
   "router_id": "10.0.0.0",
-  "topology_id": "shared-link",
+  "topology_id": "shared_link",
   "label": "Two host pairs with shared link",
   "nodes": [
     {
