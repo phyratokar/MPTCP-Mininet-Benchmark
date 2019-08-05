@@ -232,8 +232,8 @@ def main():
             bandwidths = []
             latencies = [10]
         else:
-            latencies = np.arange(0, 102, 20)
-            bandwidths = [5, 9, 13, 15, 17, 21, 25]
+            latencies = np.arange(0, 102, 30)
+            bandwidths = [5, 10, 15, 20, 25]
 
         if args.run == 'de':
             # run_latency(args.topo)
