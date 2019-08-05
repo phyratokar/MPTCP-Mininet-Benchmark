@@ -114,7 +114,7 @@ class MPMininet:
         mininet_host_pairs = map(lambda x: (self.net.get(x[0]), self.net.get(x[1])), pairs)
         return mininet_host_pairs
 
-    def run_iperf(self, runtime=15, time_interval=0.1):
+    def run_iperf(self, runtime=60, time_interval=0.1):
         """
         Starting iperf on appropriate hosts using the cmp interface provided by minient.
 
@@ -154,6 +154,7 @@ class MPMininet:
                 info('Running on {}: \'{}\'\n'.format(client, ' '.join(dump_cmd)))
                 client.cmd(dump_cmd)
 
+            # TODO: add cc into command
             client_cmd = ['iperf3', '-c', server.IP(), '-t', runtime, '-i', time_interval, '-f', 'm', '-4'] # '-J' iperf: '-y', 'C',
             file_name = '{}/{}-{}_iperf.csv'.format(self.out_folder, self.rep_num, client)
             client_cmd += ['&>', file_name, ';', 'echo', '$?']

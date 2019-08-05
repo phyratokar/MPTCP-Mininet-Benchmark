@@ -222,9 +222,18 @@ def main():
     # run_latency('two_paths')
     # run_tp_fairness('mp-vs-sp')
     # run_tp_fairness_single('single_path')
+
     if args.run:
-        latencies = np.arange(0, 102, 20)
-        bandwidths = [5, 9, 13, 15, 17, 21, 25]
+        if args.topo == 'mp_vs_sp':
+            # Only test change in bw
+            bandwidths = [5, 10, 15, 20, 25]
+            latencies = []
+        elif args.topo == 'single_bottleneck' or args.topo == 'asym_mp':
+            bandwidths = []
+            latencies = [10]
+        else:
+            latencies = np.arange(0, 102, 20)
+            bandwidths = [5, 9, 13, 15, 17, 21, 25]
 
         if args.run == 'de':
             # run_latency(args.topo)
@@ -275,7 +284,7 @@ if __name__ == '__main__':
 
     parser.add_argument('--topo',
                         help="Topology to use",
-                        choices=['shared_link', 'two_paths', 'mp_vs_sp', 'single_path', 'single_bottleneck'],
+                        choices=['asym_mp', 'mp_vs_sp', 'shared_link', 'single_bottleneck', 'single_path', 'two_paths'],
                         required=True,
                         default='two_paths')
 
