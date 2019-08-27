@@ -15,7 +15,8 @@
         "10.0.1.1"
       ],
       "properties": {
-        "server": "h2"
+        "server": "h2",
+        "cc" : "lia"
       }
     },
     {
@@ -33,7 +34,8 @@
         "10.0.0.3"
       ],
       "properties": {
-        "server": "h4"
+        "server": "h4",
+        "cc" : "lia"
       }
     },
     {
@@ -65,8 +67,7 @@
       "properties": {
         "latency": 0.1,
         "latency_text": "ms",
-        "bandwidth": 10,
-        "bandwidth_group": "a",
+        "bandwidth": 100,
         "bandwidth_text": "Mbps"
       }
     },
@@ -77,8 +78,7 @@
       "properties": {
         "latency": 0.1,
         "latency_text": "ms",
-        "bandwidth": 10,
-        "bandwidth_group": "b",
+        "bandwidth": 100,
         "bandwidth_text": "Mbps"
       }
     },
@@ -89,8 +89,7 @@
       "properties": {
         "latency": 0.1,
         "latency_text": "ms",
-        "bandwidth": 10,
-        "bandwidth_group": "b",
+        "bandwidth": 100,
         "bandwidth_text": "Mbps"
       }
     },
@@ -127,8 +126,7 @@
       "properties": {
         "latency": 0.1,
         "latency_text": "ms",
-        "bandwidth": 10,
-        "bandwidth_group": "a",
+        "bandwidth": 100,
         "bandwidth_text": "Mbps"
       }
     },
@@ -139,8 +137,7 @@
       "properties": {
         "latency": 0.1,
         "latency_text": "ms",
-        "bandwidth": 10,
-        "bandwidth_group": "b",
+        "bandwidth": 100,
         "bandwidth_text": "Mbps"
       }
     },
@@ -151,8 +148,7 @@
       "properties": {
         "latency": 0.1,
         "latency_text": "ms",
-        "bandwidth": 10,
-        "bandwidth_group": "b",
+        "bandwidth": 100,
         "bandwidth_text": "Mbps"
       }
     }

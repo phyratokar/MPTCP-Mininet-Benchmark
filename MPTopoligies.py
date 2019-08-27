@@ -1,3 +1,4 @@
+import math
 from mininet.log import info, warn, error
 from mininet.topo import Topo
 
@@ -41,6 +42,27 @@ class JsonTopo(MPTopo):
     """
     zero_warning_given = False
 
+    @staticmethod
+    def calculate_queue_size(rtt, rate, multiplier=1.5, mtu=1500, added_pkts=20):
+        """
+        Size of queue (number of packets) according to rule of thumb where the bottleneck buffer should hold at least
+        one BDP worth of packets. Multiply the BDP by a small factor to ensure even a single flow can fully utilize the
+        bottleneck and adding a small number of packets to the result to enable ultra low delay networks to function
+        properly.
+        => B = multiplier * (RTT * Rate) + n_pkts_added
+
+        :param rtt:         RTT time in ms
+        :param rate:        bottleneck rate in Mbps
+        :param multiplier:  factor by which bdp is multiplied (should be > 1 to account for tcp/ip header and timeouts)
+        :param mtu:         pkt size in bytes
+        :param added_pkts:  number of packets to add to buffer size
+        :return:            number of packets in bottleneck buffer
+        """
+        rate_Bps = 1e6 * (rate / 8)
+        rtt_seconds = rtt / 1000.0
+        bdp_pkt = rtt_seconds * rate_Bps / mtu
+        return int(math.ceil(multiplier * bdp_pkt + added_pkts))
+
     def build(self, config):
         nodes = {}
 
@@ -60,7 +82,10 @@ class JsonTopo(MPTopo):
             latency, bandwidth = link['properties']['latency'], link['properties']['bandwidth']
 
             if src not in nodes or dst not in nodes:
-                error('Link src or destination does not exist!\t{}<->{}\n'.format(src, dst))
+                error('Link src or destination does not exist! \t{}<->{}\n'.format(src, dst))
+                exit(1)
+            if latency < 0:
+                error('Link has latency smaller than 0! \t{}<->{}\n'.format(src, dst))
                 exit(1)
 
             hs, hd = nodes.get(src), nodes.get(dst)
@@ -70,9 +95,13 @@ class JsonTopo(MPTopo):
                 warn('Attention, working with "{}ms" delay in topologies where there are links with some delay can '
                       'yield unexpected results! As a precaution "0ms" is changed to "0.1ms"\n'.format(latency))
 
-            # TODO add loss to configuration if needed/specified
-            linkopts = dict(bw=bandwidth, delay='{}ms'.format(latency if latency > 1 else 0.1),
-                            jitter='0ms', max_queue_size=1000)  # loss=0
+            latency = latency if latency > 1 else 0.1
+
+            # Note: Assumption here is that only the bottleneck link notably contributes to the rtt! If that's not the
+            #       case, the buffers on the bottleneck links are too small to fully utilize the path.
+            q_size = self.calculate_queue_size(rtt=2*latency, rate=bandwidth)
+
+            linkopts = dict(bw=bandwidth, delay='{}ms'.format(latency), jitter='0ms', max_queue_size=q_size)
             self.addLink(hs, hd, **linkopts)
             info('Link added {}-{}, options {}\n'.format(hs, hd, linkopts))
 

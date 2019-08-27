@@ -1,7 +1,5 @@
 import copy
-import json
 import os
-import subprocess
 import pprint
 import itertools
 from argparse import ArgumentParser
@@ -15,60 +13,10 @@ from mininet.log import setLogLevel, info, error, debug
 
 from MPMininet import MPMininet
 from MPTopoligies import JsonTopo
+from utils import read_json, extract_groups, check_system
 
 Topologies_file = 'topologies/{}.json'
 Congestion_control_algorithms = ['lia', 'olia', 'balia', 'wvegas', 'cubic']
-
-
-def check_system():
-    """
-    Ensure MPTCP kernel and correct version of Mininet are installed on system. Mininet mismatch prints warning while
-    missing MPTCP functionalities or Mininet installation will raise exceptions.
-
-    Note:   Using mininet verison 2.2.2 or older leads to issues when many experiments are run (many build ups and
-            tear downs of miniet) because mininet nodes do not correctly close their Pseduo-TTY pipes.
-                => https://github.com/mininet/mininet/issues/838
-    """
-    out = subprocess.check_output('mn --version', shell=True, stderr=subprocess.STDOUT)
-    if not out.startswith('2.3.'):
-        print('Attention, starting with Mininet version {}, for longer runs version 2.3.x is required!'.format(out.strip()))
-
-    if not os.path.exists('/proc/sys/net/mptcp/'):
-        raise OSError('MPTCP does not seem to be installed on the system, '
-                      'please verify that the kernel supports MPTCP.')
-
-
-def read_json(file_name):
-    if not os.path.isfile(file_name):
-        print('JSON topology file not found! {}'.format(file_name))
-        exit(1)
-
-    with open(file_name, 'r') as f:
-        config = json.load(f)
-
-    return config
-
-
-def get_groups(config, group_field):
-    return [link['properties'][group_field] for link in config['links'] if group_field in link['properties']]
-
-
-def extract_groups(config, group_field):
-    """
-    Get unique groups and the number of all links withing the union of all groups.
-    :param config:      JSON config
-    :param group_field: group name
-    :return:            touple (unique groups list, number of links in all groups)
-    """
-    if group_field not in ['latency_group', 'bandwidth_group']:
-        raise NotImplementedError('Only latency and bandwidth groups currently supported, "{}" not recognized.'.format(group_field))
-
-    groups = get_groups(config, group_field)
-    unique_groups = np.unique(groups)
-    assert len(unique_groups) > 0, 'Failed to find any links belonging to a the group "{}".'.format(group_field)
-    if len(unique_groups) > 2:
-        raise NotImplementedError('Not yet supporting more than two latency/bandwidth groups for links. {}'.format(unique_groups))
-    return unique_groups, len(groups)
 
 
 def adjust_group_config(config, group_name, group, value):
@@ -91,6 +39,12 @@ def adjust_group_config(config, group_name, group, value):
     return changes
 
 
+def adjust_cc_config(config, cc):
+    for host in (h for h in config['nodes'] if h.startswith('h')):
+        if 'cc' in host['properties']:
+            host['cc'] = cc
+
+
 def run_latency(topo_name):
     group_name = 'latency_group'
     delays = np.arange(0, 102, 10)
@@ -109,6 +63,7 @@ def run_latency(topo_name):
 
                     # generate changed config
                     config = copy.deepcopy(orig_config)
+                    adjust_cc_config(config, cc_name)
 
                     changed = 0
                     for group, val in zip(latency_groups, [delay_a, delay_b]):
@@ -120,10 +75,7 @@ def run_latency(topo_name):
 
                     # pprint.pprint(cur_config)
                     # Run experiments
-                    delay_dir = '{}ms-{}ms'.format(delay_a, delay_b)
-                    tp_dir = '{}Mbps-{}Mbps'.format(10, 10)
-                    MPMininet(config, cc_name, delay_name=delay_dir,
-                              bandwidth_name=tp_dir, repetition_number=rep)
+                    MPMininet(config, repetition_number=rep)
                     # return
 
 
@@ -150,6 +102,7 @@ def run_sym_configs(topo_name, group_name, group_values):
             for cur_values in values_product:
                 # generate changed config
                 config = copy.deepcopy(orig_config)
+                adjust_cc_config(config, cc_name)
 
                 changed = 0
                 for group, val in zip(groups, cur_values):
@@ -160,18 +113,10 @@ def run_sym_configs(topo_name, group_name, group_values):
                     raise RuntimeError('There are more links with the "{}" property than just changed in the config!'.format(group_name))
 
                 # pprint.pprint(config)
-                # Run experiments
-                if group_name is 'latency_group':
-                    # TODO use actually configured bw/dealy in naming!
-                    delay_dir = '-'.join(['{}ms'.format(delay) for delay in cur_values])
-                    tp_dir = '-'.join(['{}Mbps'.format(10) for _ in bw_groups])  # '{}Mbps-{}Mbps'.format(10, 10)
-                else:
-                    delay_dir = '-'.join(['{}ms'.format(10) for _ in de_groups])  # '{}ms-{}ms'.format(0, 0)
-                    tp_dir = '-'.join(['{}Mbps'.format(bw) for bw in cur_values])
 
                 # Run experiment and shut it down immediately afterwards
-                MPMininet(config, cc_name, delay_name=delay_dir, bandwidth_name=tp_dir, repetition_number=rep,
-                          start_cli=args.cli, use_tcpdump=(not args.no_dtcp), keep_tcpdumps=args.dtcp)
+                MPMininet(config, repetition_number=rep, start_cli=args.cli,
+                          use_tcpdump=(not args.no_dtcp), keep_tcpdumps=args.dtcp)
                 # return
 
 
@@ -193,6 +138,7 @@ def run_tp_fairness(topo_name):
             for tp_a in tps_a:
                 for tp_b in tps_b:
                     config = copy.deepcopy(orig_config)
+                    adjust_cc_config(config, cc_name)
 
                     # Set link bandwidths
                     for link in config['links']:
@@ -207,11 +153,8 @@ def run_tp_fairness(topo_name):
                             # TODO handle error case
                             pass
 
-                    delay_dir = '{}ms-{}ms'.format(10, 10)
-                    tp_dir = '{}Mbps-{}Mbps'.format(tp_a, tp_b)
-
                     # Run experiments
-                    MPMininet(config, cc_name, delay_name=delay_dir, bandwidth_name=tp_dir, repetition_number=rep)
+                    MPMininet(config, repetition_number=rep)
                     # return
 
 

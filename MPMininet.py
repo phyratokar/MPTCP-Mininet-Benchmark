@@ -4,6 +4,7 @@ import shlex
 import signal
 import time
 import subprocess
+import numpy as np
 
 from MPTopoligies import JsonTopo
 from mininet.cli import CLI
@@ -11,6 +12,8 @@ from mininet.log import error, info, debug, output
 from mininet.net import Mininet
 from mininet.util import errFail
 from mininet.link import TCLink
+
+from utils import get_group_with_value, MPTCP_CCS
 
 
 def popen_wait(popen_task, timeout=-1):
@@ -34,17 +37,18 @@ def system_call(cmd, ignore_codes=None):
 
 class MPMininet:
     """Create and run multiple paths network"""
-    def __init__(self, json_config, congestion_control, delay_name, bandwidth_name, repetition_number,
-                 start_cli=False, use_tcpdump=True, keep_tcpdumps=True):
+    def __init__(self, json_config, repetition_number, start_cli=False, use_tcpdump=True, keep_tcpdumps=True):
         self.config = json_config
         self.use_tcpdump, self.keep_dumps = use_tcpdump, keep_tcpdumps
-        self.congestion_control = congestion_control
-        self.delay_name, self.tp_name = delay_name, bandwidth_name
         self.rep_num = repetition_number
         self.topology = json_config['topology_id']
         self.net = None
         self.base_folder = './logs'
-        self.out_folder = '{}/{}/{}/{}/{}'.format(self.base_folder, self.topology, self.congestion_control, self.tp_name, self.delay_name)
+        delay_dir = '-'.join(['{}ms'.format(delay) for _, delay in get_group_with_value(self.config, 'latency')])
+        bw_dir = '-'.join(['{}Mbps'.format(rate) for _, rate in get_group_with_value(self.config, 'bandwidth')])
+        self.ccs = [cc for _, _, cc in self.get_iperf_config_pairings()]
+        cc_dir = '-'.join(self.ccs)
+        self.out_folder = '{}/{}/{}/{}/{}'.format(self.base_folder, self.topology, cc_dir, bw_dir, delay_dir)
         self.start(start_cli)
 
     def start(self, cli, skipping=True):
@@ -54,8 +58,12 @@ class MPMininet:
             output('already done.\n')
             return
 
-        # TODO replace mptcp check
-        self.set_system_variables(mptcp=(self.congestion_control in ['lia', 'olia', 'balia', 'wvegas']), cc=self.congestion_control)
+        # Check if mptcp configuration is possible and set system variables
+        is_mptcp = (cc in MPTCP_CCS for cc in self.ccs)
+        if any(is_mptcp) and not all(is_mptcp):
+            raise NotImplementedError('Running a non mptcp and a mptcp congestion control algorithm simultaneously is '
+                                      'not supported. {}\n'.format(self.ccs))
+        self.set_system_variables(mptcp=any(is_mptcp), cc=self.ccs[0])
 
         topo = JsonTopo(self.config)
 
@@ -72,8 +80,12 @@ class MPMininet:
 
             self.calculate_rtt(keep_pcap=self.keep_dumps)
 
-        # CLI(self.net)
         self.net.stop()
+
+    @staticmethod
+    def _get_available_congestioncontrol_algos():
+        out, err, ret = errFail(['sysctl', '-n', 'net.ipv4.tcp_available_congestion_control'])
+        return out.strip().split()
 
     @staticmethod
     def _set_system_variable(var, value):
@@ -100,19 +112,35 @@ class MPMininet:
         MPMininet._set_system_variable('net.ipv4.tcp_congestion_control', cc)
 
     def get_iperf_pairings(self):
-        pairs = []
+        pairings = self.get_iperf_config_pairings()
+        return list(map(lambda (s, d, c): (self.net.get(s), self.net.get(d), c), pairings))
+
+    def get_iperf_config_pairings(self):
+        pairs = []  # contains tuples (client, server, congestion control algorithm)
+        ccs = []
         for node in [node for node in self.config['nodes'] if node['id'].startswith('h')]:
             if 'server' in node['properties']:
-                pairs.append((str(node['id']), str(node['properties']['server'])))
+                assert('cc' in node['properties'])
+                pairs.append((str(node['id']),
+                              str(node['properties']['server'])))
+                ccs.append(str(node['properties']['cc']))
+
+        # sort the lists alphabetically (sort by client/server pairs)
+        mixed = sorted(zip(pairs, ccs))
+        ccs = [cc for _, cc in mixed]
+        pairs = [pair for pair, _ in mixed]
 
         # make sure every host is included in some connection
         hosts = itertools.chain.from_iterable(pairs)
         for node in [node for node in self.config['nodes'] if node['id'].startswith('h')]:
             if node['id'] not in hosts:
                 error('Host {} not contained in any host pairings!\n'.format(node))
+        if any(cc not in self._get_available_congestioncontrol_algos() for cc in ccs):
+            error('Congestion Control algorithm not allowed! Tried to use {}.\n'.format(', '.join(ccs)))
+            exit(2)
 
-        mininet_host_pairs = map(lambda x: (self.net.get(x[0]), self.net.get(x[1])), pairs)
-        return mininet_host_pairs
+        assert(len(pairs) == len(ccs))
+        return [hs + (cc,) for hs, cc in zip(pairs, ccs)]
 
     def run_iperf(self, runtime=60, time_interval=0.1):
         """
@@ -132,8 +160,8 @@ class MPMininet:
             os.makedirs(self.out_folder)
 
         # Start processes on client and server
-        for _, server in iperf_pairs:
-            server_cmd = ['iperf3', '-s', '-4', '--one-off', '-f', 'm', '-i', time_interval] # iperf 3: '--one-off', '-J' iperf: '-y', 'C',
+        for _, server, _ in iperf_pairs:
+            server_cmd = ['iperf3', '-s', '-4', '--one-off', '-f', 'm', '-i', time_interval]
             file_name = '{}/{}-{}_iperf.csv'.format(self.out_folder, self.rep_num, server)
             server_cmd += ['&>', file_name]
 
@@ -142,22 +170,21 @@ class MPMininet:
             server.sendCmd(server_cmd)
         time.sleep(1)
 
-        for client, server in iperf_pairs:
+        for client, server, cc in iperf_pairs:
             if self.use_tcpdump:
                 pcap_filter = ' or '.join(['host {}'.format(intf.IP()) for intf in server.intfList()])
                 pcap_file = '{}/{}-{}_iperf_dump.pcap'.format(self.out_folder, self.rep_num, client)
                 dump_cmd = ['tcpdump', '-i', 'any', '-w', pcap_file]
                 dump_cmd += shlex.split(pcap_filter)
-                dump_cmd += ['&>', '/dev/null', '&']
+                dump_cmd += ['&>', '/dev/null', '&']  # Note: trailing `&` lets the command run in the background
 
                 dump_cmd = map(str, dump_cmd)
                 info('Running on {}: \'{}\'\n'.format(client, ' '.join(dump_cmd)))
                 client.cmd(dump_cmd)
 
-            # TODO: add cc into command
-            client_cmd = ['iperf3', '-c', server.IP(), '-t', runtime, '-i', time_interval, '-f', 'm', '-4'] # '-J' iperf: '-y', 'C',
+            client_cmd = ['iperf3', '-c', server.IP(), '-t', runtime, '-i', time_interval, '-f', 'm', '-4', '-C', cc]
             file_name = '{}/{}-{}_iperf.csv'.format(self.out_folder, self.rep_num, client)
-            client_cmd += ['&>', file_name, ';', 'echo', '$?']
+            client_cmd += ['&>', file_name, ';', 'echo', '$?']  # Note: check with `$?` the exit code of iperf3
 
             client_cmd = map(str, client_cmd)
             info('Running on {}: \'{}\'\n'.format(client, ' '.join(client_cmd)))
@@ -165,7 +192,7 @@ class MPMininet:
             client.sendCmd(client_cmd)
 
         # Wait for completion and stop all processes
-        for client, _ in iperf_pairs:
+        for client, _, _ in iperf_pairs:
             o = client.waitOutput()
             # make sure o[-3:-2] is exit code 0!
             if o[-3:-2] not in ['0']:
@@ -177,7 +204,7 @@ class MPMininet:
             client.cmd('pkill -SIGINT tcpdump')
 
         # Send interrupt to iperf3 servers and wait for completion, without waiting mininet will fail on assertion
-        for _, server in iperf_pairs:
+        for _, server, _ in iperf_pairs:
             server.sendInt()
             _ = server.monitor(timeoutms=100)
 
@@ -197,7 +224,7 @@ class MPMininet:
             info('No dumps to analyze continue.\n')
             return
 
-        for client, _ in self.get_iperf_pairings():
+        for client, _, _ in self.get_iperf_pairings():
             pcap_file = '{}/{}-{}_iperf_dump.pcap'.format(self.out_folder, self.rep_num, client)
             out_file = '{}/{}-{}_iperf_dump.csv'.format(self.out_folder, self.rep_num, client)
             parse_cmd = ['tshark', '-r', pcap_file]
@@ -222,7 +249,7 @@ class MPMininet:
 
         processes = []
 
-        for _, server in iperf_pairs:
+        for _, server, _ in iperf_pairs:
             server_cmd = 'python receiver.py -p 5001 '
             server_cmd += '-o {}/{}-{}.txt'.format(folder, self.rep_num, server)
             # server_cmd += ' --size {}'.format(8000)
@@ -231,7 +258,7 @@ class MPMininet:
             processes.append(server.popen(shlex.split(server_cmd)))
         time.sleep(1)
 
-        for client, server in iperf_pairs:
+        for client, server, _ in iperf_pairs:
             client_cmd = 'python sender.py -p 5001'
             client_cmd += ' -s {}'.format(server.IP())
             client_cmd += ' -o {}/{}-{}.txt'.format(folder, self.rep_num, client)
