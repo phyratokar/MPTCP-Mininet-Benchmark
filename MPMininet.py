@@ -43,7 +43,7 @@ class MPMininet:
             return
 
         # Check if mptcp configuration is possible and set system variables
-        is_mptcp = (cc in MPTCP_CCS for cc in self.ccs)
+        is_mptcp = [cc in MPTCP_CCS for cc in self.ccs]
         if any(is_mptcp) and not all(is_mptcp):
             raise NotImplementedError('Running a non mptcp and a mptcp congestion control algorithm simultaneously is '
                                       'not supported. {}\n'.format(self.ccs))
