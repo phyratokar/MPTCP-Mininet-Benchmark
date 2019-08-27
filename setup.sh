@@ -12,6 +12,7 @@ apt-get update
 apt-get install linux-mptcp -y
 
 
+cd
 git clone git://github.com/mininet/mininet
 cd mininet
 git checkout -b 2.3.0d6 2.3.0d6

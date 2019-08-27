@@ -47,8 +47,8 @@ class JsonTopo(MPTopo):
         """
         Size of queue (number of packets) according to rule of thumb where the bottleneck buffer should hold at least
         one BDP worth of packets. Multiply the BDP by a small factor to ensure even a single flow can fully utilize the
-        bottleneck and adding a small number of packets to the result to enable ultra low delay networks to function
-        properly.
+        bottleneck. Adding a small number of packets to the result enables ultra low delay networks and links to
+        function properly.
         => B = multiplier * (RTT * Rate) + n_pkts_added
 
         :param rtt:         RTT time in ms
@@ -99,7 +99,9 @@ class JsonTopo(MPTopo):
             latency = latency if latency > 1 else 0.1
 
             # Note: Assumption here is that only the bottleneck link notably contributes to the rtt! If that's not the
-            #       case, the buffers on the bottleneck links are too small to fully utilize the path.
+            #       case, the buffers on the bottleneck links are too small to fully utilize the path. Furthermore do
+            #       non-bottleneck links get a small fixed size buffer (~20 pkts) which should be enough to saturate the
+            #       bottlenecks as long as the links have a large enough rate compared to the bottleneck.
             q_size = self.calculate_queue_size(rtt=2 * latency, rate=bandwidth)
 
             linkopts = dict(bw=bandwidth, delay='{}ms'.format(latency), jitter='0ms', max_queue_size=q_size)

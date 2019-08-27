@@ -45,38 +45,26 @@ def adjust_cc_config(config, cc):
             host['properties']['cc'] = cc
 
 
-def run_latency(topo_name):
-    group_name = 'latency_group'
-    delays = np.arange(0, 102, 10)
+def adjust_ccs_config(config, ccs):
+    clients = [n for n in config['nodes'] if n['id'].startswith('h') and 'cc' in n['properties']]
+    assert len(ccs) == len(clients)
+    for cli, cc in zip(clients, ccs):
+        cli['properties']['cc'] = cc
 
+
+def run_cc_configs(topo_name, ccs):
     # Read in config file containing the topology
-    orig_config = read_json(Topologies_file.format(topo_name))
-    latency_groups, n_changeable_links = extract_groups(orig_config, group_field=group_name)
-    assert(len(latency_groups) <= 2)  # making sure we only deal with 2 or less groups!
+    config = read_json(Topologies_file.format(topo_name))
 
-    delays_b = delays if len(latency_groups) > 1 else delays[:1]
+    adjust_ccs_config(config, ccs)
+    # pprint.pprint(config)
+    run_single_config(config, repetitions=20)
 
-    for rep in range(3):
-        for cc_name in Congestion_control_algorithms:
-            for delay_a in delays:
-                for delay_b in delays_b:
 
-                    # generate changed config
-                    config = copy.deepcopy(orig_config)
-                    adjust_cc_config(config, cc_name)
-
-                    changed = 0
-                    for group, val in zip(latency_groups, [delay_a, delay_b]):
-                        # print('changing group {} to value {}'.format(group, val))
-                        changed += adjust_group_config(config, group_name, group, val)
-
-                    if changed != n_changeable_links: # TODO move this check out of the experiment loop, should be enought to run once!
-                        raise RuntimeError('There are more links with the "{}" property than just changed in the config!'.format(group_name))
-
-                    # pprint.pprint(cur_config)
-                    # Run experiments
-                    MPMininet(config, repetition_number=rep)
-                    # return
+def run_single_config(config, repetitions):
+    for rep in range(repetitions):
+        MPMininet(config, repetition_number=rep, start_cli=args.cli,
+                  use_tcpdump=not args.no_dtcp, keep_tcpdumps=args.dtcp)
 
 
 def run_sym_configs(topo_name, group_name, group_values):
@@ -120,53 +108,11 @@ def run_sym_configs(topo_name, group_name, group_values):
                 # return
 
 
-def run_tp_fairness(topo_name):
-    group_name = 'bandwidth_group'
-    bws = [5, 9, 13, 15, 17, 21, 25]
-
-    # Read in config file containing the topology
-    orig_config = read_json(Topologies_file.format(topo_name))
-    tp_groups, num_changeable_links = extract_groups(orig_config, group_field='bandwidth_group')
-
-    print('we have {} tp groups'.format(len(tp_groups)))
-
-    tps_a = [5, 9, 13, 15, 17, 21, 25]
-    tps_b = [5, 9, 13, 15, 17, 21, 25]
-
-    for rep in range(3):
-        for cc_name in Congestion_control_algorithms:
-            for tp_a in tps_a:
-                for tp_b in tps_b:
-                    config = copy.deepcopy(orig_config)
-                    adjust_cc_config(config, cc_name)
-
-                    # Set link bandwidths
-                    for link in config['links']:
-                        if 'bandwidth_group' in link['properties']:
-                            if link['properties']['bandwidth_group'] == 'a':
-                                link['properties']['bandwidth'] = tp_a
-                            elif link['properties']['bandwidth_group'] == 'b':
-                                link['properties']['bandwidth'] = tp_b
-                            else:
-                                raise NotImplementedError('Not yet implemented more than two bandwidth_groups for links. {}'.format(link))
-                        else:
-                            # TODO handle error case
-                            pass
-
-                    # Run experiments
-                    MPMininet(config, repetition_number=rep)
-                    # return
-
-
 def main():
     """Create and run multiple link network"""
     check_system()
 
-    # run_latency('two_paths')
-    # run_tp_fairness('mp-vs-sp')
-    # run_tp_fairness_single('single_path')
-
-    if args.run:
+    if args.run in ['de', 'tp', 'all']:
         if args.topo == 'mp_vs_sp':
             # Only test change in bw
             bandwidths = [5, 10, 15, 20, 25]
@@ -187,6 +133,18 @@ def main():
         elif args.run == 'all':
             run_sym_configs(args.topo, group_name='bandwidth_group', group_values=bandwidths)
             run_sym_configs(args.topo, group_name='latency_group', group_values=latencies)
+    elif args.run in ['cdf']:
+        if args.topo in ['single_path', 'two_paths']:
+            for cc in Congestion_control_algorithms:
+                run_cc_configs(args.topo, [cc])
+
+        elif args.topo in ['shared_link', 'mp_vs_sp', 'single_bottleneck']:
+            for cc in Congestion_control_algorithms:
+                run_cc_configs(args.topo, [cc] * 2)
+
+        elif args.topo in ['asym_mp']:
+            for cc in Congestion_control_algorithms:
+                run_cc_configs(args.topo, [cc] * 3)
     else:
         config = read_json('topologies/' + args.topo + '.json')
         topo = JsonTopo(config)
@@ -218,7 +176,7 @@ if __name__ == '__main__':
                         help="Instead of running experiments, open CLI")
 
     parser.add_argument('--run',
-                        choices=['de', 'tp', 'all'],
+                        choices=['de', 'tp', 'all', 'cdf'],
                         help="Which tasks to run")
 
     parser.add_argument('--log',
