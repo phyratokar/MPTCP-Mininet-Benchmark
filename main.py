@@ -40,7 +40,7 @@ def adjust_group_config(config, group_name, group, value):
 
 
 def adjust_cc_config(config, cc):
-    for host in (h for h in config['nodes'] if h.startswith('h')):
+    for host in (n for n in config['nodes'] if n['id'].startswith('h')):
         if 'cc' in host['properties']:
             host['cc'] = cc
 
