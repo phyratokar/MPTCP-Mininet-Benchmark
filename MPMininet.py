@@ -13,26 +13,7 @@ from mininet.net import Mininet
 from mininet.util import errFail
 from mininet.link import TCLink
 
-from utils import get_group_with_value, MPTCP_CCS
-
-
-def popen_wait(popen_task, timeout=-1):
-    delay = 1.0
-    while popen_task.poll() is None and timeout > 0:
-        time.sleep(delay)
-        timeout += delay
-    return popen_task.poll() is not None
-
-
-def system_call(cmd, ignore_codes=None):
-    try:
-        retcode = subprocess.call(shlex.split(cmd))
-        if retcode < 0:
-            error('Child was terminated by signal {}\n'.format(-retcode))
-        elif retcode > 0 and retcode not in ignore_codes:
-            error('Child returned {}\n'.format(retcode))
-    except OSError as e:
-        error('Execution failed: {}\n'.format(e))
+from utils import get_group_with_value, MPTCP_CCS, system_call
 
 
 class MPMininet:
@@ -52,10 +33,13 @@ class MPMininet:
         self.start(start_cli)
 
     def start(self, cli, skipping=True):
-        # TODO handle skip case more elegantly
         output('Running throughput experiment, exp {} repetition: {}\n'.format(self.out_folder, self.rep_num))
-        if skipping and os.path.isfile('{}/{}-{}_iperf.csv'.format(self.out_folder, self.rep_num, 'h2')):
-            output('already done.\n')
+
+        if not os.path.exists(self.out_folder):
+            os.makedirs(self.out_folder)
+
+        if skipping and os.path.isfile('{}/{}-{}_iperf_dump.csv'.format(self.out_folder, self.rep_num, 'h1')):
+            output('\talready done.\n')
             return
 
         # Check if mptcp configuration is possible and set system variables
@@ -63,10 +47,9 @@ class MPMininet:
         if any(is_mptcp) and not all(is_mptcp):
             raise NotImplementedError('Running a non mptcp and a mptcp congestion control algorithm simultaneously is '
                                       'not supported. {}\n'.format(self.ccs))
-        self.set_system_variables(mptcp=any(is_mptcp), cc=self.ccs[0])
+        self.set_sysctl_variable('net.mptcp.mptcp_enabled', int(any(is_mptcp)))
 
         topo = JsonTopo(self.config)
-
         # add host=CPULimitedHost if applicable
         self.net = Mininet(topo=topo, link=TCLink)
         topo.setup_routing(self.net)
@@ -88,7 +71,7 @@ class MPMininet:
         return out.strip().split()
 
     @staticmethod
-    def _set_system_variable(var, value):
+    def set_sysctl_variable(var, value):
         """
         Use Mininet command execution to set and verify sysctl variables.
 
@@ -103,19 +86,19 @@ class MPMininet:
         if type(value) is bool and bool(out) != value or type(value) is not bool and out != str(value):
             raise Exception("sysctl Fail: setting {} failed, should be {} is {}".format(var, value, out))
 
-    @staticmethod
-    def set_system_variables(mptcp, cc):
-        # Setting up MPTCP
-        MPMininet._set_system_variable('net.mptcp.mptcp_enabled', int(mptcp))
-
-        # Congestion control
-        MPMininet._set_system_variable('net.ipv4.tcp_congestion_control', cc)
-
     def get_iperf_pairings(self):
+        """
+        Turn name into mininet host references.
+        :return:    list of tuples (client, server, cc)
+        """
         pairings = self.get_iperf_config_pairings()
         return list(map(lambda (s, d, c): (self.net.get(s), self.net.get(d), c), pairings))
 
     def get_iperf_config_pairings(self):
+        """
+        Read pairings from JSON config, which clients talks to which server with what congestion control algorithm.
+        :return:    list of tuples (client_name, server_name, cc)
+        """
         pairs = []  # contains tuples (client, server, congestion control algorithm)
         ccs = []
         for node in [node for node in self.config['nodes'] if node['id'].startswith('h')]:
@@ -142,7 +125,28 @@ class MPMininet:
         assert(len(pairs) == len(ccs))
         return [hs + (cc,) for hs, cc in zip(pairs, ccs)]
 
-    def run_iperf(self, runtime=60, time_interval=0.1):
+    def get_iperf3_cmds(self, client, server, runtime, time_interval, cc):
+        """
+        Generate iperf3 commands to run on client/server pair.
+        :param client:          mininet client reference
+        :param server:          mininet server reference
+        :param runtime:         time to run in seconds
+        :param time_interval:   report interval for iperf3
+        :param cc:              congestion control algorithm name to use
+        :return:                tuple (cli_cmd, srv_cmd)
+        """
+        file_name = '{}/{}-'.format(self.out_folder, self.rep_num)
+        file_name += '{}_iperf.csv'
+
+        client_cmd = ['iperf3', '-c', server.IP(), '-t', runtime, '-i', time_interval, '-f', 'm', '-4', '-C', cc]
+        client_cmd += ['&>', file_name.format(client)]
+
+        server_cmd = ['iperf3', '-s', '-4', '--one-off', '-f', 'm', '-i', time_interval]
+        server_cmd += ['&>', file_name.format(server)]
+
+        return map(str, client_cmd), map(str, server_cmd)
+
+    def run_iperf(self, runtime=120, time_interval=0.1):
         """
         Starting iperf on appropriate hosts using the cmp interface provided by minient.
 
@@ -156,18 +160,17 @@ class MPMininet:
         """
         iperf_pairs = self.get_iperf_pairings()
 
-        if not os.path.exists(self.out_folder):
-            os.makedirs(self.out_folder)
+        # Generate iperf commands for both server and client
+        iperf_cmds = {}  # map host to iperf cmd
+        for cli, srv, cc in iperf_pairs:
+            cli_cmd, srv_cmd = self.get_iperf3_cmds(cli, srv, runtime, time_interval, cc)
+            iperf_cmds[cli] = cli_cmd
+            iperf_cmds[srv] = srv_cmd
 
         # Start processes on client and server
         for _, server, _ in iperf_pairs:
-            server_cmd = ['iperf3', '-s', '-4', '--one-off', '-f', 'm', '-i', time_interval]
-            file_name = '{}/{}-{}_iperf.csv'.format(self.out_folder, self.rep_num, server)
-            server_cmd += ['&>', file_name]
-
-            server_cmd = map(str, server_cmd)
-            info('Running on {}: \'{}\'\n'.format(server, ' '.join(server_cmd)))
-            server.sendCmd(server_cmd)
+            info('Running on {}: \'{}\'\n'.format(server, ' '.join(iperf_cmds[server])))
+            server.sendCmd(iperf_cmds[server])
         time.sleep(1)
 
         for client, server, cc in iperf_pairs:
@@ -177,27 +180,23 @@ class MPMininet:
                 dump_cmd = ['tcpdump', '-i', 'any', '-w', pcap_file]
                 dump_cmd += shlex.split(pcap_filter)
                 dump_cmd += ['&>', '/dev/null', '&']  # Note: trailing `&` lets the command run in the background
-
                 dump_cmd = map(str, dump_cmd)
+
                 info('Running on {}: \'{}\'\n'.format(client, ' '.join(dump_cmd)))
                 client.cmd(dump_cmd)
 
-            client_cmd = ['iperf3', '-c', server.IP(), '-t', runtime, '-i', time_interval, '-f', 'm', '-4', '-C', cc]
-            file_name = '{}/{}-{}_iperf.csv'.format(self.out_folder, self.rep_num, client)
-            client_cmd += ['&>', file_name, ';', 'echo', '$?']  # Note: check with `$?` the exit code of iperf3
-
-            client_cmd = map(str, client_cmd)
-            info('Running on {}: \'{}\'\n'.format(client, ' '.join(client_cmd)))
-
-            client.sendCmd(client_cmd)
+            # Note: check the exit code of iperf with `$?`
+            cli_cmd = iperf_cmds[client] + [';', 'echo', '$?']
+            info('Running on {}: \'{}\'\n'.format(client, ' '.join(cli_cmd)))
+            client.sendCmd(cli_cmd)
 
         # Wait for completion and stop all processes
         for client, _, _ in iperf_pairs:
             o = client.waitOutput()
-            # make sure o[-3:-2] is exit code 0!
-            if o[-3:-2] not in ['0']:
-                error('client popen did not exit correctly\n')
-                raise RuntimeError('Client iperf did not exit correctly, error code {}\n'.format(o[-3:-2]),
+            # make sure exit code 0!
+            if not o.strip().endswith('0'):
+                error('client cmd did not exit correctly\n')
+                raise RuntimeError('Client iperf did not exit correctly, error code {}\n'.format(o.strip()),
                                    self.out_folder, self.rep_num)
 
             # interrupt tcpdump
@@ -242,16 +241,11 @@ class MPMininet:
         iperf_pairs = self.get_iperf_pairings()
         info("Running clients and servers, repetition: {}\n".format(self.rep_num))
 
-        folder = '{}/{}/{}/{}/{}'.format(self.out_folder, self.topology, self.congestion_control, self.tp_name, self.delay_name)
-
-        if not os.path.exists(folder):
-            os.makedirs(folder)
-
         processes = []
 
         for _, server, _ in iperf_pairs:
             server_cmd = 'python receiver.py -p 5001 '
-            server_cmd += '-o {}/{}-{}.txt'.format(folder, self.rep_num, server)
+            server_cmd += '-o {}/{}-{}.txt'.format(self.out_folder, self.rep_num, server)
             # server_cmd += ' --size {}'.format(8000)
             print('Running \'{}\' on {}'.format(server_cmd, server))
 
@@ -261,7 +255,7 @@ class MPMininet:
         for client, server, _ in iperf_pairs:
             client_cmd = 'python sender.py -p 5001'
             client_cmd += ' -s {}'.format(server.IP())
-            client_cmd += ' -o {}/{}-{}.txt'.format(folder, self.rep_num, client)
+            client_cmd += ' -o {}/{}-{}.txt'.format(self.out_folder, self.rep_num, client)
             client_cmd += ' -t {}'.format(runtime)
             # client_cmd += ' --size {}'.format(8000)
             print('Running \'{}\' on {}'.format(client_cmd, client))

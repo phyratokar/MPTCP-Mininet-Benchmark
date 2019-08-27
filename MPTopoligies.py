@@ -1,4 +1,5 @@
 import math
+
 from mininet.log import info, warn, error
 from mininet.topo import Topo
 
@@ -11,7 +12,6 @@ class MPTopo(Topo):
     """
     HOST_IP = '10.0.{0}.{1}'
     HOST_MAC = '00:00:00:00:{0:02x}:{1:02x}'
-    JITTER = '0.001ms'
 
     def _setup_routing_per_host(self, host):
         # Manually set the ip addresses of the interfaces
@@ -27,9 +27,9 @@ class MPTopo(Topo):
 
             # Setup routing tables to so the kernel routes different source addresses through different interfaces.
             # See http://multipath-tcp.org/pmwiki.php/Users/ConfigureRouting for information
-            host.cmd('ip rule add from {} table {}'.format(ip, i+1))
-            host.cmd('ip route add {}/24 dev {} scope link table {}'.format(gateway, intf_name, i+1))
-            host.cmd('ip route add default via {} dev {} table {}'.format(gateway, intf_name, i+1))
+            host.cmd('ip rule add from {} table {}'.format(ip, i + 1))
+            host.cmd('ip route add {}/24 dev {} scope link table {}'.format(gateway, intf_name, i + 1))
+            host.cmd('ip route add default via {} dev {} table {}'.format(gateway, intf_name, i + 1))
 
     def setup_routing(self, net):
         for host in self.hosts():
@@ -66,6 +66,7 @@ class JsonTopo(MPTopo):
     def build(self, config):
         nodes = {}
 
+        # Add Hosts and Switches
         for node in config['nodes']:
             if node['id'].startswith('h'):
                 info('Host {} added\n'.format(node['id']))
@@ -77,29 +78,29 @@ class JsonTopo(MPTopo):
                 error('Unknown node type encountered!\n')
                 exit(1)
 
+        # Add links
         for link in config['links']:
             src, dst = link['source'], link['target']
             latency, bandwidth = link['properties']['latency'], link['properties']['bandwidth']
 
+            # check if link config is valid
             if src not in nodes or dst not in nodes:
                 error('Link src or destination does not exist! \t{}<->{}\n'.format(src, dst))
                 exit(1)
             if latency < 0:
                 error('Link has latency smaller than 0! \t{}<->{}\n'.format(src, dst))
                 exit(1)
-
-            hs, hd = nodes.get(src), nodes.get(dst)
-
-            if latency == 0 and not self.zero_warning_given:
+            elif latency == 0 and not self.zero_warning_given:
                 self.zero_warning_given = True
                 warn('Attention, working with "{}ms" delay in topologies where there are links with some delay can '
-                      'yield unexpected results! As a precaution "0ms" is changed to "0.1ms"\n'.format(latency))
+                     'yield unexpected results! As a precaution "0ms" is changed to "0.1ms"\n'.format(latency))
 
+            hs, hd = nodes.get(src), nodes.get(dst)
             latency = latency if latency > 1 else 0.1
 
             # Note: Assumption here is that only the bottleneck link notably contributes to the rtt! If that's not the
             #       case, the buffers on the bottleneck links are too small to fully utilize the path.
-            q_size = self.calculate_queue_size(rtt=2*latency, rate=bandwidth)
+            q_size = self.calculate_queue_size(rtt=2 * latency, rate=bandwidth)
 
             linkopts = dict(bw=bandwidth, delay='{}ms'.format(latency), jitter='0ms', max_queue_size=q_size)
             self.addLink(hs, hd, **linkopts)
@@ -205,4 +206,3 @@ class MPagainstSPTopo(MPTopo):
 
 
 topos = {'mytopo': (lambda: SingleMPFlowTopo())}
-

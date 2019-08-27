@@ -1,8 +1,11 @@
-import os
 import json
+import os
+import shlex
 import subprocess
-import numpy as np
+import time
 
+import numpy as np
+from mininet.log import error
 
 MPTCP_CCS = ['lia', 'olia', 'balia', 'wvegas']
 
@@ -18,11 +21,31 @@ def check_system():
     """
     out = subprocess.check_output('mn --version', shell=True, stderr=subprocess.STDOUT)
     if not out.startswith('2.3.'):
-        print('Attention, starting with Mininet version {}, for longer runs version 2.3.x is required!'.format(out.strip()))
+        print('Attention, starting with Mininet version {}, for longer runs version 2.3.x is required!'.format(
+            out.strip()))
 
     if not os.path.exists('/proc/sys/net/mptcp/'):
         raise OSError('MPTCP does not seem to be installed on the system, '
                       'please verify that the kernel supports MPTCP.')
+
+
+def system_call(cmd, ignore_codes=None):
+    try:
+        retcode = subprocess.call(shlex.split(cmd))
+        if retcode < 0:
+            error('Child was terminated by signal {}\n'.format(-retcode))
+        elif retcode > 0 and retcode not in ignore_codes:
+            error('Child returned {}\n'.format(retcode))
+    except OSError as e:
+        error('Execution failed: {}\n'.format(e))
+
+
+def popen_wait(popen_task, timeout=-1):
+    delay = 1.0
+    while popen_task.poll() is None and timeout > 0:
+        time.sleep(delay)
+        timeout += delay
+    return popen_task.poll() is not None
 
 
 def read_json(file_name):
@@ -48,7 +71,8 @@ def gen_groups(config, field):
     :return:            generated (group_name, value)
     """
     if field not in ['latency', 'bandwidth']:
-        raise NotImplementedError('Only latency and bandwidth groups currently supported, "{}" not recognized.'.format(field))
+        raise NotImplementedError(
+            'Only latency and bandwidth groups currently supported, "{}" not recognized.'.format(field))
 
     group_field = field + '_group'
     for link in config['links']:
@@ -64,13 +88,15 @@ def extract_groups(config, group_field):
     :return:            tuple (unique groups list, number of links in all groups)
     """
     if group_field not in ['latency_group', 'bandwidth_group']:
-        raise NotImplementedError('Only latency and bandwidth groups currently supported, "{}" not recognized.'.format(group_field))
+        raise NotImplementedError(
+            'Only latency and bandwidth groups currently supported, "{}" not recognized.'.format(group_field))
 
     groups = get_groups(config, group_field)
     unique_groups = np.unique(groups)
     assert len(unique_groups) > 0, 'Failed to find any links belonging to a group "{}".'.format(group_field)
     if len(unique_groups) > 2:
-        raise NotImplementedError('Not yet supporting more than two latency/bandwidth groups for links. {}'.format(unique_groups))
+        raise NotImplementedError(
+            'Not yet supporting more than two latency/bandwidth groups for links. {}'.format(unique_groups))
     return unique_groups, len(groups)
 
 
@@ -78,8 +104,10 @@ def get_group_with_value(config, group_field):
     groups = list(gen_groups(config, group_field))
     group_set = set(groups)
     if len(group_set) != len(set((x[0] for x in groups))):
-        raise RuntimeError('Groups with multiple values encountered, only one value allowed per group. {}'.format(group_set))
+        raise RuntimeError(
+            'Groups with multiple values encountered, only one value allowed per group. {}'.format(group_set))
     assert len(group_set) > 0, 'Failed to find any links belonging to a group "{}".'.format(group_field)
     if len(group_set) > 2:
-        raise NotImplementedError('Not yet supporting more than two latency/bandwidth groups for links. {}'.format(group_set))
+        raise NotImplementedError(
+            'Not yet supporting more than two latency/bandwidth groups for links. {}'.format(group_set))
     return sorted(list(group_set))
