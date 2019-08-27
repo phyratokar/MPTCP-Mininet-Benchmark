@@ -42,7 +42,7 @@ def adjust_group_config(config, group_name, group, value):
 def adjust_cc_config(config, cc):
     for host in (n for n in config['nodes'] if n['id'].startswith('h')):
         if 'cc' in host['properties']:
-            host['cc'] = cc
+            host['properties']['cc'] = cc
 
 
 def run_latency(topo_name):
