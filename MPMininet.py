@@ -25,10 +25,10 @@ class MPMininet:
         self.topology = json_config['topology_id']
         self.net = None
         self.base_folder = './logs'
-        delay_dir = '-'.join(['{}ms'.format(delay) for _, delay in get_group_with_value(self.config, 'latency')])
-        bw_dir = '-'.join(['{}Mbps'.format(rate) for _, rate in get_group_with_value(self.config, 'bandwidth')])
+        delay_dir = '_'.join(['{}ms'.format(float(delay)) for _, delay in get_group_with_value(self.config, 'latency')])
+        bw_dir = '_'.join(['{}Mbps'.format(int(rate)) for _, rate in get_group_with_value(self.config, 'bandwidth')])
         self.ccs = [cc for _, _, cc in self.get_iperf_config_pairings()]
-        cc_dir = '-'.join(self.ccs)
+        cc_dir = '_'.join(self.ccs)
         self.out_folder = '{}/{}/{}/{}/{}'.format(self.base_folder, self.topology, cc_dir, bw_dir, delay_dir)
         self.start(start_cli)
 
@@ -135,7 +135,7 @@ class MPMininet:
         :param cc:              congestion control algorithm name to use
         :return:                tuple (cli_cmd, srv_cmd)
         """
-        file_name = '{}/{}-'.format(self.out_folder, self.rep_num)
+        file_name = '{}/{}_'.format(self.out_folder, self.rep_num)
         file_name += '{}_iperf.csv'
 
         client_cmd = ['iperf3', '-c', server.IP(), '-t', runtime, '-i', time_interval, '-f', 'm', '-4', '-C', cc]
