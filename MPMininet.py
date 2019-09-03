@@ -176,7 +176,7 @@ class MPMininet:
         for client, server, cc in iperf_pairs:
             if self.use_tcpdump:
                 pcap_filter = ' or '.join(['host {}'.format(intf.IP()) for intf in server.intfList()])
-                pcap_file = '{}/{}-{}_iperf_dump.pcap'.format(self.out_folder, self.rep_num, client)
+                pcap_file = '{}/{}_{}_iperf_dump.pcap'.format(self.out_folder, self.rep_num, client)
                 dump_cmd = ['tcpdump', '-i', 'any', '-w', pcap_file]
                 dump_cmd += shlex.split(pcap_filter)
                 dump_cmd += ['&>', '/dev/null', '&']  # Note: trailing `&` lets the command run in the background
