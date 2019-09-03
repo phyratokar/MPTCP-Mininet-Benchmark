@@ -38,7 +38,7 @@ class MPMininet:
         if not os.path.exists(self.out_folder):
             os.makedirs(self.out_folder)
 
-        if skipping and os.path.isfile('{}/{}-{}_iperf_dump.csv'.format(self.out_folder, self.rep_num, 'h1')):
+        if skipping and os.path.isfile('{}/{}_{}_iperf_dump.csv'.format(self.out_folder, self.rep_num, 'h1')):
             output('\talready done.\n')
             return
 
@@ -224,8 +224,8 @@ class MPMininet:
             return
 
         for client, _, _ in self.get_iperf_pairings():
-            pcap_file = '{}/{}-{}_iperf_dump.pcap'.format(self.out_folder, self.rep_num, client)
-            out_file = '{}/{}-{}_iperf_dump.csv'.format(self.out_folder, self.rep_num, client)
+            pcap_file = '{}/{}_{}_iperf_dump.pcap'.format(self.out_folder, self.rep_num, client)
+            out_file = '{}/{}_{}_iperf_dump.csv'.format(self.out_folder, self.rep_num, client)
             parse_cmd = ['tshark', '-r', pcap_file]
             parse_cmd += ['-e', 'frame.time_relative', '-e', 'tcp.stream', '-e', 'ip.src', '-e', 'ip.dst',
                           '-e', 'tcp.analysis.ack_rtt', '-e', 'tcp.options.mptcp.datalvllen', '-T', 'fields',
@@ -245,7 +245,7 @@ class MPMininet:
 
         for _, server, _ in iperf_pairs:
             server_cmd = 'python receiver.py -p 5001 '
-            server_cmd += '-o {}/{}-{}.txt'.format(self.out_folder, self.rep_num, server)
+            server_cmd += '-o {}/{}_{}.txt'.format(self.out_folder, self.rep_num, server)
             # server_cmd += ' --size {}'.format(8000)
             print('Running \'{}\' on {}'.format(server_cmd, server))
 
@@ -255,7 +255,7 @@ class MPMininet:
         for client, server, _ in iperf_pairs:
             client_cmd = 'python sender.py -p 5001'
             client_cmd += ' -s {}'.format(server.IP())
-            client_cmd += ' -o {}/{}-{}.txt'.format(self.out_folder, self.rep_num, client)
+            client_cmd += ' -o {}/{}_{}.txt'.format(self.out_folder, self.rep_num, client)
             client_cmd += ' -t {}'.format(runtime)
             # client_cmd += ' --size {}'.format(8000)
             print('Running \'{}\' on {}'.format(client_cmd, client))
