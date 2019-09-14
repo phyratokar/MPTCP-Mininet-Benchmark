@@ -1,46 +1,77 @@
 import math
+import itertools
 
 from mininet.log import info, warn, error
+from mininet.net import Mininet
 from mininet.topo import Topo
 
+import utils
 
-class MPTopo(Topo):
+
+class MPMininetWrapper(Mininet):
     """
-    Parent abstract class which enables the child topologies to make the hosts mptcp ready.
+    Wrapper around Mininet to enable make hosts MPTCP ready by setting IP addresses and setting up routing.
     IP schema:
         10.0.x.y: where y denotes the host id and x the interface id, e.g. h1-eth0 has 10.0.0.1 and h2-eth2 has 10.0.1.2
     """
     HOST_IP = '10.0.{0}.{1}'
     HOST_MAC = '00:00:00:00:{0:02x}:{1:02x}'
 
-    def _setup_routing_per_host(self, host):
-        # Manually set the ip addresses of the interfaces
-        host_id = int(host.name[1:])
+    def __init__(self, *args, **kwargs):
+        super(MPMininetWrapper, self).__init__(*args, **kwargs)
+        self.setup_routing()
 
-        for i, intf_name in enumerate(host.intfNames()):
-            ip = self.HOST_IP.format(i, host_id)
-            gateway = self.HOST_IP.format(i, 0)
-            mac = self.HOST_MAC.format(i, host_id)
+    def setup_routing(self):
+        """
+        Set IP and MAC address for each interface on each host.
+        :return:    None
+        """
+        for host in self.hosts:
+            # Manually set the ip addresses of the interfaces
+            host_id = int(host.name[1:])
 
-            # set IP and MAC of host
-            host.intf(intf_name).config(ip='{}/24'.format(ip), mac=mac)
+            for i, intf_name in enumerate(host.intfNames()):
+                ip = self.HOST_IP.format(i, host_id)
+                gateway = self.HOST_IP.format(i, 0)
+                mac = self.HOST_MAC.format(i, host_id)
 
-            # Setup routing tables to so the kernel routes different source addresses through different interfaces.
-            # See http://multipath-tcp.org/pmwiki.php/Users/ConfigureRouting for information
-            host.cmd('ip rule add from {} table {}'.format(ip, i + 1))
-            host.cmd('ip route add {}/24 dev {} scope link table {}'.format(gateway, intf_name, i + 1))
-            host.cmd('ip route add default via {} dev {} table {}'.format(gateway, intf_name, i + 1))
+                # set IP and MAC of host
+                host.intf(intf_name).config(ip='{}/24'.format(ip), mac=mac)
 
-    def setup_routing(self, net):
-        for host in self.hosts():
-            self._setup_routing_per_host(net.get(host))
+                # Setup routing tables to so the kernel routes different source addresses through different interfaces.
+                # See http://multipath-tcp.org/pmwiki.php/Users/ConfigureRouting for information
+                host.cmd('ip rule add from {} table {}'.format(ip, i + 1))
+                host.cmd('ip route add {}/24 dev {} scope link table {}'.format(gateway, intf_name, i + 1))
+                host.cmd('ip route add default via {} dev {} table {}'.format(gateway, intf_name, i + 1))
+
+
+class MPTopo(Topo):
+    """
+    Parent abstract class which serves as a template for the child topologies.
+    """
+
+    def __init__(self, *args, **kwargs):
+        self.host_pairings, self.host_cc = None, None
+        super(MPTopo, self).__init__(*args, **kwargs)
+
+    def get_host_pairings(self):
+        """ Override this method, specifying the client-server pairs """
+        if self.get_host_pairings.im_func == MPTopo.get_host_pairings.im_func:
+            raise NotImplementedError('Topologies must implement get_host_pairings')
+
+    def get_cc_host(self):
+        """ Override this method, specifying which host runs what congestion control """
+        pass
 
 
 class JsonTopo(MPTopo):
     """
-    JSON definition of Topology.
+    Build Minient Topology from JSON definition.
     """
-    zero_warning_given = False
+    def __init__(self, *args, **kwargs):
+        self.zero_warning_given = False
+        self.json_config = None
+        super(JsonTopo, self).__init__(*args, **kwargs)
 
     @staticmethod
     def calculate_queue_size(rtt, rate, multiplier=1.5, mtu=1500, added_pkts=20):
@@ -58,12 +89,18 @@ class JsonTopo(MPTopo):
         :param added_pkts:  number of packets to add to buffer size
         :return:            number of packets in bottleneck buffer
         """
-        rate_Bps = 1e6 * (rate / 8)
+        rate_bps = 1e6 * (rate / 8)
         rtt_seconds = rtt / 1000.0
-        bdp_pkt = rtt_seconds * rate_Bps / mtu
+        bdp_pkt = rtt_seconds * rate_bps / mtu
         return int(math.ceil(multiplier * bdp_pkt + added_pkts))
 
     def build(self, config):
+        """
+        Given JSON definition of topology, build a Mininet network.
+        :param config:  JSON config
+        :return:        None
+        """
+        self.json_config = config
         nodes = {}
 
         # Add Hosts and Switches
@@ -110,6 +147,46 @@ class JsonTopo(MPTopo):
 
         # print('\n'.join(['{} <-> {}, \tlatency: {}, \tbandwidth: {}Mbps'
         #                 .format(s, d, c['delay'], c['bw']) for s, d, c in self.links(sort=True, withInfo=True)]))
+        self._set_host_pairings()
+
+    def get_host_pairings(self):
+        return self.host_pairings
+
+    def get_cc_host(self):
+        # assert host_name in self.host_cc, 'Specified host name not found in configuration.\n'
+        return self.host_cc
+
+    def _set_host_pairings(self):
+        """
+        Read pairings from JSON config, which clients talks to which server with what congestion control algorithm.
+        Note: Assumption is that only senders set a congestion control scheme
+        """
+        pairs, ccs = [], []
+        for node in [node for node in self.json_config['nodes'] if node['id'].startswith('h')]:
+            if 'server' in node['properties']:
+                assert('cc' in node['properties'])
+                pairs.append((str(node['id']), str(node['properties']['server'])))
+                ccs.append(str(node['properties']['cc']))
+
+        # sort the lists alphabetically (sort by client/server pairs)
+        zipped_list = sorted(zip(pairs, ccs))
+        ccs = [cc for _, cc in zipped_list]
+        pairs = [pair for pair, _ in zipped_list]
+
+        # make sure every host is included in some connection and all mininet hosts are utilized
+        hosts = list(itertools.chain.from_iterable(pairs))
+        json_hosts = [n for n in self.json_config['nodes'] if n['id'].startswith('h')]
+        assert all(n['id'] in hosts for n in json_hosts), \
+            'Host {} not contained in any host pairings!\n'.format(map(lambda x: x['id'], json_hosts))
+        assert all(h in hosts for h in self.hosts()), \
+            'Host {} not contained in any host pairings!\n'.format(self.hosts())
+        assert all(cc in utils.get_system_available_congestioncontrol_algos() for cc in ccs), \
+            'Congestion Control algorithm not allowed by sysctl! Tried to use {}.\n'.format(', '.join(ccs))
+        assert(len(pairs) == len(ccs)), \
+            'JSONTopo._set_host_pairings(): Unequal number of paris and congestion control names.\n'
+
+        self.host_pairings = pairs
+        self.host_cc = {h[0]: cc for h, cc in zip(pairs, ccs)}
 
 
 class SharedLinkTopo(MPTopo):

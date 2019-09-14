@@ -6,6 +6,8 @@ import time
 
 import numpy as np
 from mininet.log import error
+from mininet.util import errFail
+
 
 MPTCP_CCS = ['lia', 'olia', 'balia', 'wvegas']
 
@@ -38,6 +40,11 @@ def system_call(cmd, ignore_codes=None):
             error('Child returned {}\n'.format(retcode))
     except OSError as e:
         error('Execution failed: {}\n'.format(e))
+
+
+def get_system_available_congestioncontrol_algos():
+    out, err, ret = errFail(['sysctl', '-n', 'net.ipv4.tcp_available_congestion_control'])
+    return out.strip().split()
 
 
 def popen_wait(popen_task, timeout=-1):

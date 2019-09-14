@@ -2,6 +2,7 @@
 *.pyc
 .ipynb_checkpoints/
 node_modules/
+logs/
 .idea/
 venv/
 *.pem

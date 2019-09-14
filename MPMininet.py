@@ -6,10 +6,9 @@ import time
 import subprocess
 import numpy as np
 
-from MPTopoligies import JsonTopo
+from MPTopoligies import JsonTopo, MPMininetWrapper
 from mininet.cli import CLI
 from mininet.log import error, info, debug, output
-from mininet.net import Mininet
 from mininet.util import errFail
 from mininet.link import TCLink
 
@@ -19,28 +18,31 @@ from utils import get_group_with_value, MPTCP_CCS, system_call
 class MPMininet:
     """Create and run multiple paths network"""
     def __init__(self, json_config, repetition_number, start_cli=False, use_tcpdump=True, keep_tcpdumps=True):
-        self.config = json_config
+        self.base_folder = './logs'
+        self.net, self.topo, self.topology, self.ccs, self.out_folder = None, None, None, None, None
         self.use_tcpdump, self.keep_dumps = use_tcpdump, keep_tcpdumps
         self.rep_num = repetition_number
-        self.topology = json_config['topology_id']
-        self.net = None
-        self.base_folder = './logs'
-        delay_dir = '_'.join(['{}ms'.format(float(delay)) for _, delay in get_group_with_value(self.config, 'latency')])
-        bw_dir = '_'.join(['{}Mbps'.format(int(rate)) for _, rate in get_group_with_value(self.config, 'bandwidth')])
-        self.ccs = [cc for _, _, cc in self.get_iperf_config_pairings()]
-        cc_dir = '_'.join(self.ccs)
-        self.out_folder = '{}/{}/{}/{}/{}'.format(self.base_folder, self.topology, cc_dir, bw_dir, delay_dir)
+
+        # TODO bubble up to main function, so it is Topology Class agnostic
+        self.config = json_config
+        self.topology = self.config['topology_id']
+        self.topo = JsonTopo(self.config)
+
+        self.setup()
         self.start(start_cli)
 
-    def start(self, cli, skipping=True):
-        output('Running throughput experiment, exp {} repetition: {}\n'.format(self.out_folder, self.rep_num))
+    def setup(self):
+        self.ccs = self.topo.get_cc_host().values()
 
+        delay_dir = '_'.join(['{}ms'.format(float(delay)) for _, delay in get_group_with_value(self.config, 'latency')])
+        bw_dir = '_'.join(['{}Mbps'.format(int(rate)) for _, rate in get_group_with_value(self.config, 'bandwidth')])
+        cc_dir = '_'.join(self.ccs)
+        self.out_folder = '{}/{}/{}/{}/{}'.format(self.base_folder, self.topology, cc_dir, bw_dir, delay_dir)
+
+        # Print info and setup folders
+        output('Setting up experiment, exp {} repetition: {}\n'.format(self.out_folder, self.rep_num))
         if not os.path.exists(self.out_folder):
             os.makedirs(self.out_folder)
-
-        if skipping and os.path.isfile('{}/{}_{}_iperf_dump.csv'.format(self.out_folder, self.rep_num, 'h1')):
-            output('\talready done.\n')
-            return
 
         # Check if mptcp configuration is possible and set system variables
         is_mptcp = [cc in MPTCP_CCS for cc in self.ccs]
@@ -49,10 +51,13 @@ class MPMininet:
                                       'not supported. {}\n'.format(self.ccs))
         self.set_sysctl_variable('net.mptcp.mptcp_enabled', int(any(is_mptcp)))
 
-        topo = JsonTopo(self.config)
+    def start(self, cli, skipping=True):
+        if skipping and os.path.isfile('{}/{}_{}_iperf_dump.csv'.format(self.out_folder, self.rep_num, 'h1')):
+            output('\talready done.\n')
+            return
+
         # add host=CPULimitedHost if applicable
-        self.net = Mininet(topo=topo, link=TCLink)
-        topo.setup_routing(self.net)
+        self.net = MPMininetWrapper(topo=self.topo, link=TCLink)
         self.net.start()
 
         if cli:
@@ -64,11 +69,6 @@ class MPMininet:
             self.calculate_rtt(keep_pcap=self.keep_dumps)
 
         self.net.stop()
-
-    @staticmethod
-    def _get_available_congestioncontrol_algos():
-        out, err, ret = errFail(['sysctl', '-n', 'net.ipv4.tcp_available_congestion_control'])
-        return out.strip().split()
 
     @staticmethod
     def set_sysctl_variable(var, value):
@@ -91,39 +91,9 @@ class MPMininet:
         Turn name into mininet host references.
         :return:    list of tuples (client, server, cc)
         """
-        pairings = self.get_iperf_config_pairings()
+        ccs = self.topo.get_cc_host()
+        pairings = [hs + (ccs[hs[0]],) for hs in self.topo.get_host_pairings()]
         return list(map(lambda (s, d, c): (self.net.get(s), self.net.get(d), c), pairings))
-
-    def get_iperf_config_pairings(self):
-        """
-        Read pairings from JSON config, which clients talks to which server with what congestion control algorithm.
-        :return:    list of tuples (client_name, server_name, cc)
-        """
-        pairs = []  # contains tuples (client, server, congestion control algorithm)
-        ccs = []
-        for node in [node for node in self.config['nodes'] if node['id'].startswith('h')]:
-            if 'server' in node['properties']:
-                assert('cc' in node['properties'])
-                pairs.append((str(node['id']),
-                              str(node['properties']['server'])))
-                ccs.append(str(node['properties']['cc']))
-
-        # sort the lists alphabetically (sort by client/server pairs)
-        mixed = sorted(zip(pairs, ccs))
-        ccs = [cc for _, cc in mixed]
-        pairs = [pair for pair, _ in mixed]
-
-        # make sure every host is included in some connection
-        hosts = itertools.chain.from_iterable(pairs)
-        for node in [node for node in self.config['nodes'] if node['id'].startswith('h')]:
-            if node['id'] not in hosts:
-                error('Host {} not contained in any host pairings!\n'.format(node))
-        if any(cc not in self._get_available_congestioncontrol_algos() for cc in ccs):
-            error('Congestion Control algorithm not allowed! Tried to use {}.\n'.format(', '.join(ccs)))
-            exit(2)
-
-        assert(len(pairs) == len(ccs))
-        return [hs + (cc,) for hs, cc in zip(pairs, ccs)]
 
     def get_iperf3_cmds(self, client, server, runtime, time_interval, cc):
         """
