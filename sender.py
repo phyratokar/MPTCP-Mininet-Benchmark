@@ -1,3 +1,9 @@
+"""
+Sender python implementation sending random traffic to receiver.
+Credit to Wen-Chien Chen and Kevin Han which implemented this:
+https://bitbucket.org/iamtheone188/cs244-2015-wckh-mptcp/src/master/
+https://reproducingnetworkresearch.wordpress.com/2015/05/31/cs-244-15-reproducing-the-3gwifi-application-level-latency-results-in-mptcp/
+"""
 from argparse import ArgumentParser
 from struct import pack
 from time import sleep

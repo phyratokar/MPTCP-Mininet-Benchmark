@@ -15,6 +15,13 @@ from utils import MPTCP_CCS, system_call
 class MPMininetExp:
     """Create and run multiple paths network"""
     def __init__(self, repetition_number, topology, start_cli=False, use_tcpdump=True, keep_tcpdumps=True):
+        """
+        :param repetition_number: number to distinguish different runs of same configuration
+        :param topology:        Topology given to Mininet to build network
+        :param start_cli:       Start Minient CLI instead of running iperf3
+        :param use_tcpdump:     capture pcap file with tcpdump
+        :param keep_tcpdumps:   keep pcap files in the end after extracting pkt rtts
+        """
         self.base_folder = './logs'
         self.topo = topology
         self.rep_num = repetition_number
@@ -42,6 +49,13 @@ class MPMininetExp:
         self.set_sysctl_variable('net.mptcp.mptcp_enabled', int(any(is_mptcp)))
 
     def start(self, cli, skipping=True):
+        """
+        Start Mininet and run iperf tests.
+
+        :param cli:     open Minient CLI instead of running iperf tests
+        :param skipping: skip already existing experiments, else overwrite logs
+        :return:        None
+        """
         if skipping and os.path.isfile('{}/{}_{}_iperf_dump.csv'.format(self.out_folder, self.rep_num, 'h1')):
             output('\talready done.\n')
             return
@@ -79,6 +93,7 @@ class MPMininetExp:
     def get_iperf_pairings(self):
         """
         Turn name into mininet host references.
+
         :return:    list of tuples (client, server, cc)
         """
         ccs = self.topo.get_ccs_per_host()
@@ -88,6 +103,7 @@ class MPMininetExp:
     def get_iperf3_cmds(self, client, server, runtime, time_interval, cc):
         """
         Generate iperf3 commands to run on client/server pair.
+
         :param client:          mininet client reference
         :param server:          mininet server reference
         :param runtime:         time to run in seconds
@@ -108,7 +124,7 @@ class MPMininetExp:
 
     def run_iperf(self, runtime=120, time_interval=0.1):
         """
-        Starting iperf on appropriate hosts using the cmp interface provided by minient.
+        Starting iperf3 on appropriate hosts using the cmp interface provided by minient.
 
         Note: Mininet also exposes a popen mechanism for executing commands on any node. I encountered issues when using
             it. Somehow the many popen commands lead to iperf3 having a bufferoverflow exception.
@@ -198,6 +214,13 @@ class MPMininetExp:
                 os.remove(pcap_file)
 
     def run(self, runtime=30):
+        """
+        For now unused function which runs a sender and receiver program. Demonstrates how a custom program can be run
+        instead of iperf.
+
+        :param runtime: Time to run the sender
+        :return:        None
+        """
         iperf_pairs = self.get_iperf_pairings()
         info("Running clients and servers, repetition: {}\n".format(self.rep_num))
 
@@ -227,4 +250,8 @@ class MPMininetExp:
         print('Done with experiment\n' + '.'*80 + '\n')
 
     def stop(self):
+        """ Stop Mininet and kill every potential remaining program """
         self.net.stop()
+        system_call('pkill iperf3', ignore_codes=[1])
+        system_call('pkill tcpdump', ignore_codes=[1])
+        system_call('pkill ping', ignore_codes=[1])
