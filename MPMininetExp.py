@@ -1,54 +1,44 @@
-import itertools
 import os
 import shlex
-import signal
 import time
 import subprocess
-import numpy as np
 
-from MPTopoligies import JsonTopo, MPMininetWrapper
+from MPTopoligies import MPMininetWrapper
 from mininet.cli import CLI
 from mininet.log import error, info, debug, output
 from mininet.util import errFail
 from mininet.link import TCLink
 
-from utils import get_group_with_value, MPTCP_CCS, system_call
+from utils import MPTCP_CCS, system_call
 
 
-class MPMininet:
+class MPMininetExp:
     """Create and run multiple paths network"""
-    def __init__(self, json_config, repetition_number, start_cli=False, use_tcpdump=True, keep_tcpdumps=True):
+    def __init__(self, repetition_number, topology, start_cli=False, use_tcpdump=True, keep_tcpdumps=True):
         self.base_folder = './logs'
-        self.net, self.topo, self.topology, self.ccs, self.out_folder = None, None, None, None, None
-        self.use_tcpdump, self.keep_dumps = use_tcpdump, keep_tcpdumps
+        self.topo = topology
         self.rep_num = repetition_number
+        self.use_tcpdump, self.keep_dumps = use_tcpdump, keep_tcpdumps
+        self.net, self.out_folder = None, None
 
-        # TODO bubble up to main function, so it is Topology Class agnostic
-        self.config = json_config
-        self.topology = self.config['topology_id']
-        self.topo = JsonTopo(self.config)
-
+        # Setup network and start experiment
         self.setup()
         self.start(start_cli)
 
     def setup(self):
-        self.ccs = self.topo.get_cc_host().values()
-
-        delay_dir = '_'.join(['{}ms'.format(float(delay)) for _, delay in get_group_with_value(self.config, 'latency')])
-        bw_dir = '_'.join(['{}Mbps'.format(int(rate)) for _, rate in get_group_with_value(self.config, 'bandwidth')])
-        cc_dir = '_'.join(self.ccs)
-        self.out_folder = '{}/{}/{}/{}/{}'.format(self.base_folder, self.topology, cc_dir, bw_dir, delay_dir)
-
         # Print info and setup folders
+        self.out_folder = os.path.join(self.base_folder, self.topo.get_logs_dir())
+
         output('Setting up experiment, exp {} repetition: {}\n'.format(self.out_folder, self.rep_num))
         if not os.path.exists(self.out_folder):
             os.makedirs(self.out_folder)
 
         # Check if mptcp configuration is possible and set system variables
-        is_mptcp = [cc in MPTCP_CCS for cc in self.ccs]
+        ccs = self.topo.get_ccs_per_host().values()
+        is_mptcp = [cc in MPTCP_CCS for cc in ccs]
         if any(is_mptcp) and not all(is_mptcp):
             raise NotImplementedError('Running a non mptcp and a mptcp congestion control algorithm simultaneously is '
-                                      'not supported. {}\n'.format(self.ccs))
+                                      'not supported. {}\n'.format(ccs))
         self.set_sysctl_variable('net.mptcp.mptcp_enabled', int(any(is_mptcp)))
 
     def start(self, cli, skipping=True):
@@ -91,7 +81,7 @@ class MPMininet:
         Turn name into mininet host references.
         :return:    list of tuples (client, server, cc)
         """
-        ccs = self.topo.get_cc_host()
+        ccs = self.topo.get_ccs_per_host()
         pairings = [hs + (ccs[hs[0]],) for hs in self.topo.get_host_pairings()]
         return list(map(lambda (s, d, c): (self.net.get(s), self.net.get(d), c), pairings))
 

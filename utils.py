@@ -55,6 +55,7 @@ def popen_wait(popen_task, timeout=-1):
     return popen_task.poll() is not None
 
 
+# JSON functions
 def read_json(file_name):
     if not os.path.isfile(file_name):
         print('JSON topology file not found! {}'.format(file_name))
@@ -118,3 +119,36 @@ def get_group_with_value(config, group_field):
         raise NotImplementedError(
             'Not yet supporting more than two latency/bandwidth groups for links. {}'.format(group_set))
     return sorted(list(group_set))
+
+
+def adjust_group_config(config, group_name, group, value):
+    """
+    Change latency or bandwidth value of entire group in JSON config.
+
+    :param config:      JSON/dict config to be changed (inplace!)
+    :param group_name:  'latency_group' / 'bandwidth_group'
+    :param group:       groupname, e.g. 'a' or 'b'
+    :param value:       value to set, e.g. '10.0'
+    :return:            number of link properties changed
+    """
+    value_name = group_name.partition('_')[0]
+    changes = 0
+    for link in config['links']:
+        if group_name in link['properties']:
+            if link['properties'][group_name] == group:
+                link['properties'][value_name] = value
+                changes += 1
+    return changes
+
+
+def adjust_cc_config(config, cc):
+    for host in (n for n in config['nodes'] if n['id'].startswith('h')):
+        if 'cc' in host['properties']:
+            host['properties']['cc'] = cc
+
+
+def adjust_ccs_config(config, ccs):
+    clients = [n for n in config['nodes'] if n['id'].startswith('h') and 'cc' in n['properties']]
+    assert len(ccs) == len(clients)
+    for cli, cc in zip(clients, ccs):
+        cli['properties']['cc'] = cc

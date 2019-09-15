@@ -1,5 +1,6 @@
 import math
 import itertools
+import os
 
 from mininet.log import info, warn, error
 from mininet.net import Mininet
@@ -54,24 +55,26 @@ class MPTopo(Topo):
         self.host_pairings, self.host_cc = None, None
         super(MPTopo, self).__init__(*args, **kwargs)
 
+    def get_topo_name(self):
+        """ Override this method, giving the topology a name """
+        if self.get_topo_name.im_func == MPTopo.get_topo_name.im_func:
+            raise NotImplementedError('Topologies must implement get_topo_name')
+
+
     def get_host_pairings(self):
         """ Override this method, specifying the client-server pairs """
         if self.get_host_pairings.im_func == MPTopo.get_host_pairings.im_func:
             raise NotImplementedError('Topologies must implement get_host_pairings')
 
-    def get_cc_host(self):
+    def get_ccs_per_host(self):
         """ Override this method, specifying which host runs what congestion control """
-        pass
+        if self.get_ccs_per_host.im_func == MPTopo.get_ccs_per_host.im_func:
+            raise NotImplementedError('Topologies must implement get_ccs_per_host')
 
-
-class JsonTopo(MPTopo):
-    """
-    Build Minient Topology from JSON definition.
-    """
-    def __init__(self, *args, **kwargs):
-        self.zero_warning_given = False
-        self.json_config = None
-        super(JsonTopo, self).__init__(*args, **kwargs)
+    def get_logs_dir(self):
+        """ Override this method, specifying the subfolder path where to store logfiles """
+        if self.get_logs_dir.im_func == MPTopo.get_logs_dir.im_func:
+            raise NotImplementedError('Topologies must implement get_logs_dir')
 
     @staticmethod
     def calculate_queue_size(rtt, rate, multiplier=1.5, mtu=1500, added_pkts=20):
@@ -93,6 +96,19 @@ class JsonTopo(MPTopo):
         rtt_seconds = rtt / 1000.0
         bdp_pkt = rtt_seconds * rate_bps / mtu
         return int(math.ceil(multiplier * bdp_pkt + added_pkts))
+
+
+class JsonTopo(MPTopo):
+    """
+    Build Minient Topology from JSON definition.
+    """
+    def __init__(self, *args, **kwargs):
+        self.zero_warning_given = False
+        self.json_config = None
+        super(JsonTopo, self).__init__(*args, **kwargs)
+
+    def get_topo_name(self):
+        return self.json_config['topology_id']
 
     def build(self, config):
         """
@@ -145,16 +161,21 @@ class JsonTopo(MPTopo):
             self.addLink(hs, hd, **linkopts)
             info('Link added {}-{}, options {}\n'.format(hs, hd, linkopts))
 
+        self._set_host_pairings()
         # print('\n'.join(['{} <-> {}, \tlatency: {}, \tbandwidth: {}Mbps'
         #                 .format(s, d, c['delay'], c['bw']) for s, d, c in self.links(sort=True, withInfo=True)]))
-        self._set_host_pairings()
 
     def get_host_pairings(self):
         return self.host_pairings
 
-    def get_cc_host(self):
-        # assert host_name in self.host_cc, 'Specified host name not found in configuration.\n'
+    def get_ccs_per_host(self):
         return self.host_cc
+
+    def get_logs_dir(self):
+        cc_dir = '_'.join(self.get_ccs_per_host().values())
+        delay_dir = '_'.join(['{}ms'.format(float(delay)) for _, delay in utils.get_group_with_value(self.json_config, 'latency')])
+        bw_dir = '_'.join(['{}Mbps'.format(int(rate)) for _, rate in utils.get_group_with_value(self.json_config, 'bandwidth')])
+        return os.path.join(self.get_topo_name(), cc_dir, bw_dir, delay_dir)
 
     def _set_host_pairings(self):
         """
