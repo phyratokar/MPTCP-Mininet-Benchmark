@@ -60,7 +60,6 @@ class MPTopo(Topo):
         if self.get_topo_name.im_func == MPTopo.get_topo_name.im_func:
             raise NotImplementedError('Topologies must implement get_topo_name')
 
-
     def get_host_pairings(self):
         """ Override this method, specifying the client-server pairs """
         if self.get_host_pairings.im_func == MPTopo.get_host_pairings.im_func:

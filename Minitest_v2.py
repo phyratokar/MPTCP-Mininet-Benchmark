@@ -26,16 +26,16 @@ class SingleFlowTopo(Topo):
         # linkopts = dict(jitter='0ms', max_queue_size=q_size)  # loss=0
 
         # Add links
-        self.addLink(h1, s1, bw=100, delay='0.1ms', jitter='0ms', max_queue_size=10)
+        self.addLink(h1, s1, bw=100, delay='0.1ms', jitter='0ms', max_queue_size=20)
         self.addLink(s1, s2, bw=10, delay='{}ms'.format(delay), jitter='0ms', max_queue_size=q_size)
-        self.addLink(s2, h2, bw=100, delay='0.1ms', jitter='0ms', max_queue_size=10)
+        self.addLink(s2, h2, bw=100, delay='0.1ms', jitter='0ms', max_queue_size=20)
 
 
 def main():
-    runtime = 120
-    ccs = ['lia'] # ['cubic', 'lia', 'olia', 'balia', 'wvegas']
-    delays = [1, 25, 50, 75, 100]
-    q_multipliers = [1, 1.2, 1.5, 2]
+    runtime = 30
+    ccs = ['wvegas']  # ['cubic', 'lia', 'olia', 'balia', 'wvegas']
+    delays = [50]  # [1, 25, 50, 75, 100]
+    q_multipliers = [2]  # [1, 1.2, 1.5, 2]
 
     num_exps = len(ccs) * len(delays) * len(q_multipliers)
 
@@ -43,8 +43,8 @@ def main():
     finish_time = datetime.datetime.now() + datetime.timedelta(seconds=exp_runtime)
     print('Expected Runtime:\t{}h\nExpected end of Experiments:\t{}'.format(exp_runtime/3600.0, finish_time))
 
-
     os.system('modprobe mptcp_balia; modprobe mptcp_wvegas; modprobe mptcp_olia; modprobe mptcp_coupled')
+    os.system('modprobe tcp_vegas')
     os.system('sysctl -w net.mptcp.mptcp_enabled=1')
     os.system('sysctl -w net.mptcp.mptcp_path_manager=fullmesh')
     os.system('sysctl -w net.mptcp.mptcp_scheduler=default')
@@ -56,7 +56,7 @@ def main():
             for q_multiplier in q_multipliers:
                 # Start Mininet
                 rtt = 2 * delay
-                q_size = int(q_multiplier * (rtt / 1000.0) * 10 / 8 * 1e6 / 1500)
+                q_size = int(q_multiplier * (rtt / 1000.0) * 10 / 8 * 1e6 / 1500) + 20
                 print('cc: {}, delay: {}, q_size: {}'.format(cc, delay, q_size))
                 topo = SingleFlowTopo(q_size=q_size, delay=delay)
                 net = Mininet(topo=topo, link=TCLink)
@@ -70,14 +70,30 @@ def main():
                 exp_name = '{}_{}q_{}rtt'.format(cc, q_size, rtt)
 
                 ping_popen = src.popen('ping', dst.IP())
-                dump_popen = src.popen('tcpdump', '-i', 'any', '-w', '{}_middleQ_dump.pcap'.format(exp_name), 'host', dst.IP())
+                dump_popen = src.popen('tcpdump', '-i', 'any', '-w', '{}_dump.pcap'.format(exp_name), 'host', dst.IP())
 
-                srv_tp, _ = net.iperf([src, dst], seconds=runtime)
+                links = net.get('s1').connectionsTo(net.get('s2'))
+
+                dst_iperf = dst.popen('iperf3', '-s')
+                time.sleep(1)
+                src_iperf = src.popen('iperf3', '-c' '10.0.0.2', '-t', '20', '-C', cc)
+
+                time.sleep(10)
+                links[0][0].config(bw=10, delay='{}ms'.format(delay), jitter='0ms')
+                links[0][1].config(bw=10, delay='{}ms'.format(delay), jitter='0ms')
+
+                out, err = src_iperf.communicate()
+                dst_iperf.terminate()
+                srv_tp = out.replace('iperf Done.', '').strip().splitlines()[-1].split()[6]
+                print(out)
+
+                # srv_tp, _ = net.iperf([src, dst], seconds=runtime)
 
                 ping_popen.send_signal(SIGINT)
                 dump_popen.send_signal(SIGINT)
 
                 # out, _err = ping_popen.communicate()
+                print('\t\t\t\t\t{} reached: \t{} Mbps'.format(cc, srv_tp))
 
                 with open('{}_middleQ_log.txt'.format(exp_name), 'w') as f:
                     f.write('cc: {}\tdelay: {}\trtt: {}\tq_size: {}\n'.format(cc, delay, rtt, q_size))

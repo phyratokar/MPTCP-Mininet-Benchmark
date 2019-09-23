@@ -5,7 +5,7 @@ if [ "$EUID" -ne 0 ]
   exit
 fi
 
-
+apt update
 apt-key adv --keyserver hkp://keys.gnupg.net --recv-keys 379CE192D401AB61
 sh -c "echo 'deb https://dl.bintray.com/cpaasch/deb stretch main' > /etc/apt/sources.list.d/mptcp.list"
 apt-get update
@@ -17,9 +17,9 @@ git clone git://github.com/mininet/mininet
 cd mininet
 git checkout -b 2.3.0d6 2.3.0d6
 cd ..
-sh ./mininet/util/install.sh -a
+./mininet/util/install.sh -a
 
-apt-get install iperf3 tcpdump htop python-pip zip htop
+apt-get install -y iperf3 tcpdump htop python-pip zip htop
 pip install numpy pandas
 
 echo "Please reboot the system to enable the mptcp kernel, Mininet should be installed and working."

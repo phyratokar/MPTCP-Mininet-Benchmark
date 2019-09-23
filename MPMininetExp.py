@@ -13,7 +13,7 @@ from utils import MPTCP_CCS, system_call
 
 
 class MPMininetExp:
-    """Create and run multiple paths network"""
+    """Create and run a multi-path network"""
     def __init__(self, repetition_number, topology, start_cli=False, use_tcpdump=True, keep_tcpdumps=True):
         """
         :param repetition_number: number to distinguish different runs of same configuration
@@ -122,7 +122,7 @@ class MPMininetExp:
 
         return map(str, client_cmd), map(str, server_cmd)
 
-    def run_iperf(self, runtime=120, time_interval=0.1):
+    def run_iperf(self, runtime=60, time_interval=0.1):
         """
         Starting iperf3 on appropriate hosts using the cmp interface provided by minient.
 
