@@ -1,5 +1,5 @@
 # MPTCP Mininet Benchmarking tool
-
+The benchmark tool uses Mininet and the MPTCP kernel to test the congestion control algorithms implemented in the kernel.
 
 ## Getting started on a Ubuntu Server
 
@@ -44,12 +44,20 @@ sudo dmsg | grep MPTCP
 To install Mininet, simply clone the repository and use the convenience script Mininet provides.
 
 ```
-cd
 git clone git://github.com/mininet/mininet
 cd mininet
 git checkout -b 2.3.0d6 2.3.0d6
 cd ..
 ./mininet/util/install.sh -a
+```
+
+### Other requirements
+Depending on whether the jupyter analysis script also needs to run on the same machine, also jupyter and pandas needs to be implemented.
+Otherwise make sure at least to install iperf3, tcpdump, numpy.
+
+```
+sudo apt-get install -y iperf3 tcpdump python-pip htop
+pip install numpy
 ```
 
 ## Running MPTCP Mininet experiments
@@ -60,5 +68,15 @@ Eg. `sudo modprobe mptcp_coupled` to load LIA.
 After loading the necessary modules, the benchmark can be run with the following command:
 
 ```
-sudo python main.py --run de --topo two_paths
+sudo python main.py --topo two_paths --run de
 ```
+For available options run python `main.py -h`.
+
+Important options:
+
+- topo: name of topology to use, points to JSON configs in folder `topologies` but can easily be adapted.
+- run: which experiments to run
+- cli: instead of running the experiment normally, run Mininet in CLI mode
+- log: set the log level of Mininet
+- no_dtcp: do not use tcpdump at all (no delay analysis possible)
+- dtcp: keep packet trace file after experiment for further analysis
